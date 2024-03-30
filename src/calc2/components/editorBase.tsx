@@ -40,6 +40,111 @@ require('codemirror/addon/display/autorefresh.js');
 require('codemirror/mode/sql/sql.js');
 require('handsontable/dist/handsontable.full.css');
 
+CodeMirror.defineMode('trc', function () {
+	const keywords = ['exists', 'forAll', 'and', 'or', 'not', 'implies', 'empty'];
+	const keywordsMath = ['∅', '∀', '∃'];
+	const operators = ['∧', '∨', '=', '¬', '→'];
+	const matchAny = (
+		stream: CodeMirror.StringStream,
+		array: string[],
+		consume: boolean,
+		successorPattern = '',
+	) => {
+		for (let i = 0; i < array.length; i++) {
+			const match = (
+				!successorPattern
+					? stream.match(array[i], consume)
+					: stream.match(new RegExp(`^${array[i]}${successorPattern}`), consume)
+			);
+
+			if (match) {
+				return true;
+			}
+		}
+		return false;
+	};
+	const separators = '([\\(\\)\[\\]\{\\}, \\.\\t]|$)';
+
+	return {
+		startState: () => {
+			return {
+				inBlockComment: false,
+			};
+		},
+		token: (stream: CodeMirror.StringStream, state) => {
+			if (state.inBlockComment) {
+				if (stream.match(/.*?\*\//, true)) {
+					state.inBlockComment = false;
+				}
+				else {
+					stream.match(/.*/, true);
+				}
+				return 'comment';
+			}
+			else if (stream.match(/\/\*.*?\*\//, true)) {
+				return 'comment';
+			}
+			else if (!state.inBlockComment && stream.match(/^\/\*.*/, true)) {
+				state.inBlockComment = true;
+				return 'comment';
+			}
+
+			else if (state.inInlineRelation) {
+				if (stream.match(/.*?}/, true)) {
+					state.inInlineRelation = false;
+				}
+				else {
+					stream.match(/.*/, true);
+				}
+				return 'inlineRelation';
+			}
+			else if (stream.match(/^{/, true)) {
+				state.inInlineRelation = true;
+				return 'inlineRelation';
+			}
+
+			else if (stream.match(/^--[\t ]/, true)) {
+				stream.skipToEnd();
+				return 'comment';
+			}
+			else if (stream.match(/^\/\*.*?$/, true)) {
+				return 'comment';
+			}
+			else if (matchAny(stream, keywordsMath, true)) {
+				return 'keyword math'; // needed for the correct font
+			}
+			else if (matchAny(stream, keywords, true, separators)) {
+				return 'keyword';
+			}
+			else if (matchAny(stream, operators, true)) {
+				return 'operator math';
+			}
+			else if (stream.match(/^\[[0-9]+]/, true)) {
+				return 'attribute';
+			}
+			else if (stream.match(/^[0-9]+(\.[0-9]+)?/, true)) {
+				return 'number';
+			}
+			else if (stream.match(/\^'[^']*'/i, true)) {
+				return 'string';
+			}
+			else if (stream.match(/\^[a-z]+\.[a-z]*/i, true)) {
+				return 'qualified-column';
+			}
+			else if (stream.match(/^[\(\)\[]\{},]/i, true)) {
+				return 'bracket';
+			}
+			else if (stream.match(/^[a-z][a-z0-9\.]*/i, true)) {
+				return 'word';
+			}
+			else {
+				stream.next();
+				return 'else';
+			}
+		},
+	};
+});
+
 CodeMirror.defineMode('relalg', function () {
 	const keywords = [
 		'pi', 'sigma', 'rho', 'tau', '<-', '->', 'intersect', 'union', 'except', '/', '-', '\\\\', 'x', 'cross join', 'join',
