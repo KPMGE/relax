@@ -10,7 +10,7 @@ declare namespace trcAst {
 	interface Expression {
 		type: 'expression',
 		projection: Projection,
-		predicate: string
+		predicate: Predicate
 	}
 
 	interface Projection {
@@ -18,4 +18,31 @@ declare namespace trcAst {
 		relation: string,
 		columns: string[]
 	}
+
+	interface Predicate {
+		type: 'predicate',
+		quantifier: string,
+		relation: string,
+		relationAlias: string,
+		condition: booleanExpr
+	}
+
+	// interface Condition {
+	// 	type: 'comparison',
+	// 	attribute: string,
+	// 	operator: string,
+	// 	value: number | string
+	// }
+
+	interface valueExpr {
+		type: 'valueExpr',
+		child: undefined,
+		child2: undefined,
+		assignments: undefined,
+		datatype: 'string' | 'boolean' | 'number' | 'null' | 'date',
+		func: relalgAst.ValueExprFunction,
+		args: valueExpr[] | any[],
+	}
+
+	interface booleanExpr extends valueExpr { }
 }

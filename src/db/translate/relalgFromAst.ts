@@ -58,23 +58,29 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.rootTrc, relations: { [key:
 		let node: RANode | null = null
 
 		switch (nRaw.type) {
-			case 'projection': {
-				const relation = relations[nRaw.relation].copy()
-				const columns = nRaw.columns.map((colName: string) => new Column(colName, null))
+			case 'expression': {
+				const projection = nRaw.projection
+				const predicate = nRaw.predicate
+
+				const relation = relations[projection.relation].copy()
+				const columns = projection.columns.map((colName: string) => new Column(colName, null))
+
+				// where
+				const selection = new Selection(relation, recValueExpr(predicate.condition))
 
 				// select *
 				if (columns.length === 0) {
-					node = relation
+					node = selection
 				} else {
 					// select <cols..>
-					node = new Projection(relation, columns)
+					node = new Projection(selection, columns)
 				}
-			}
-				break;
+			} break;
 
 			default:
 				throw new Error(`type ${nRaw.type} not implemented`);
 		}
+
 
 		if (!node) {
 			throw new Error(`Should not happen`);
@@ -83,7 +89,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.rootTrc, relations: { [key:
 		return node
 	}
 
-	return rec(astRoot.child.projection)
+	return rec(astRoot.child)
 }
 
 

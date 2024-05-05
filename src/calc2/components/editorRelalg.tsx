@@ -73,6 +73,8 @@ export class EditorRelalg extends React.Component<Props, State> {
 				mode="relalg"
 				execFunction={(self: EditorBase, text: string, offset) => {
 					const ast = parseRelalg(text, Object.keys(relations));
+					console.log('REALG AST: ', ast)
+
 					replaceVariables(ast, relations);
 
 					if (ast.child === null) {
