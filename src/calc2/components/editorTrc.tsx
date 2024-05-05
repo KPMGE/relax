@@ -1,12 +1,15 @@
+import React from "react";
 import { EditorBase, getHintsFromGroup } from "./editorBase";
 import { Item } from "./toolbar";
 import { Group } from 'calc2/store/groups';
-import React from "react";
+import { Relation } from 'db/exec/Relation';
+import { Result } from "./result";
+import { relalgFromTRCAstRoot, parseTRCSelect } from "db/relalg";
 
 const NUM_TREE_LABEL_COLORS = 6;
 const KEYWORDS_TRC = ['exists', 'forAll', '|', 'and', 'or', 'not', 'implies', '=', 'empty'];
 
-interface Props { 
+interface Props {
 	group: Group,
 	replaceSelection?(text: string): void,
 	// relInsertModalToggle: Function,
@@ -22,18 +25,17 @@ export class EditorTrc extends React.Component<Props> {
 	}
 
 	render() {
-		// const autoreplaceOperatorsMode: 'none' | 'header' | 'plain2math' | 'math2plain' = 'none';
 		const { group } = this.props;
 		// TODO: move to state
-		// const relations: { [name: string]: Relation } = {};
-		// group.tables.forEach(table => {
-		// 	relations[table.tableName] = table.relation;
-		// });
+		const relations: { [name: string]: Relation } = {};
+		group.tables.forEach(table => {
+			relations[table.tableName] = table.relation;
+		});
 
 
 		return (
 			<EditorBase
-				textChange={(cm: CodeMirror.Editor) => { } }
+				textChange={(cm: CodeMirror.Editor) => { }}
 				exampleSql={group.exampleSQL}
 				exampleRA={group.exampleRA}
 				ref={ref => {
@@ -43,7 +45,29 @@ export class EditorTrc extends React.Component<Props> {
 				}}
 				mode="trc"
 				// @ts-ignore
-				execFunction={}
+				execFunction={(self: EditorBase, text: string, offset) => {
+					self.historyAddEntry(text);
+
+					console.log('TEXT SQL: ', text)
+
+					const ast = parseTRCSelect(text);
+
+					console.log('PARSED TRC AST: ', ast)
+
+					const root = relalgFromTRCAstRoot(ast, relations)
+
+					root.check()
+
+					return {
+						result: (
+							<Result
+								root={root}
+								numTreeLabelColors={NUM_TREE_LABEL_COLORS}
+								execTime={self.state.execTime == null ? 0 : self.state.execTime}
+							/>
+						),
+					};
+				}}
 				tab="trc"
 				linterFunction={() => [...KEYWORDS_TRC]}
 				getHintsFunction={() => {

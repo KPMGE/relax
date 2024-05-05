@@ -31,8 +31,6 @@ import { Selection } from '../exec/Selection';
 import { Union } from '../exec/Union';
 import * as ValueExpr from '../exec/ValueExpr';
 
-
-
 function parseJoinCondition(condition: relalgAst.booleanExpr | string[] | null): JoinCondition {
 	if (condition === null) {
 		return {
@@ -52,6 +50,40 @@ function parseJoinCondition(condition: relalgAst.booleanExpr | string[] | null):
 			joinExpression: recValueExpr(condition as relalgAst.booleanExpr),
 		};
 	}
+}
+
+// translate a TRC-AST to RA
+export function relalgFromTRCAstRoot(astRoot: trcAst.rootTrc, relations: { [key: string]: Relation }): RANode {
+	function rec(nRaw: trcAst.astNode | any): RANode {
+		let node: RANode | null = null
+
+		switch (nRaw.type) {
+			case 'projection': {
+				const relation = relations[nRaw.relation].copy()
+				const columns = nRaw.columns.map((colName: string) => new Column(colName, null))
+
+				// select *
+				if (columns.length === 0) {
+					node = relation
+				} else {
+					// select <cols..>
+					node = new Projection(relation, columns)
+				}
+			}
+				break;
+
+			default:
+				throw new Error(`type ${nRaw.type} not implemented`);
+		}
+
+		if (!node) {
+			throw new Error(`Should not happen`);
+		}
+
+		return node
+	}
+
+	return rec(astRoot.child.projection)
 }
 
 
@@ -156,10 +188,10 @@ export function relalgFromSQLAstRoot(astRoot: sqlAst.rootSql | any, relations: {
 					const rec1: any = rec(n.child);
 					const rec2: any = rec(n.child2);
 					const probableJoinCount = getRowLength(rec1) * getRowLength(rec2);
-					
+
 					// tried and tested with multiple devices / browsers
 					// this seems to be where the browser starts to freeze up
-					if(probableJoinCount > 1000000) {
+					if (probableJoinCount > 1000000) {
 						alert('The CrossJoin may cause the browser to crash. Alternatively try using an INNER JOIN');
 					}
 					node = new CrossJoin(rec(n.child), rec(n.child2));
@@ -425,12 +457,12 @@ function recValueExpr(n: relalgAst.valueExpr | sqlAst.valueExpr): ValueExpr.Valu
 }
 
 function getRowLength(node: any, length: number = 0): number {
-	if(!node) { return 0; }
-	if(node._table) {
+	if (!node) { return 0; }
+	if (node._table) {
 		return node._table._rows.length;
 	}
-	if(node._child) {
-		return getRowLength(node._child) * getRowLength(node._child2);	
+	if (node._child) {
+		return getRowLength(node._child) * getRowLength(node._child2);
 	}
 	return 0;
 }

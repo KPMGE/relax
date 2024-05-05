@@ -13,7 +13,12 @@ import { replaceVariables } from './translate/replaceVariables';
 
 
 export { parseRelalg, parseRelalgGroup } from './parser/parser_ra';
-export { relalgFromRelalgAstNode, relalgFromRelalgAstRoot, relalgFromSQLAstRoot } from './translate/relalgFromAst';
+export { 
+	relalgFromRelalgAstNode,
+	relalgFromRelalgAstRoot,
+	relalgFromSQLAstRoot,
+	relalgFromTRCAstRoot
+} from './translate/relalgFromAst';
 export { replaceVariables } from './translate/replaceVariables';
 export { textFromGroupAstRoot, textFromRelalgAstNode, textFromRelalgAstRoot } from './translate/textFromAst';
 
@@ -130,6 +135,30 @@ export function queryWithReplacedOperatorsFromAst(
 }
 
 
+
+const pegParserTrc = require('./parser/grammar_trc.pegjs') as any;
+
+export function parseTRCSelect(text: string): trcAst.rootTrc {
+
+	return pegParserTrc.parse(
+		text,
+		{
+			startRule: 'start',
+			tracer: undefined,
+			i18n,
+		},
+	);
+}
+
+export function parseTRCDump(text: string): relalgAst.GroupRoot {
+	return pegParserTrc.parse(
+		text,
+		{
+			startRule: 'dbDumpStart',
+			tracer: undefined,
+		},
+	);
+}
 
 
 const pegParserSql = require('./parser/grammar_sql.pegjs') as any;
