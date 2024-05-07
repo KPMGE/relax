@@ -55,10 +55,10 @@
 		}
 	}
 
-	function createConstantExpression(value) {
+	function createConstantExpression(datatype, value) {
 		return {
 			type: 'valueExpr',
-			datatype: 'number',
+			datatype,
 			func: 'constant',
 			args: [value],
 		}
@@ -83,10 +83,46 @@
 
 
 	function createComparison(attribute, operator, value) {
+		const valueDataType = typeof value === 'number' ? 'number' : 'string'
 		const columnName = attribute.split('.')[1]
 		const columnExp = createColumnValueExpression(columnName)
-		const constExp = createConstantExpression(value)
+		const constExp = createConstantExpression(valueDataType, value)
 		return createBooleanExpression(operator, [columnExp, constExp])
+	}
+
+	function getOperatorString(operator) {
+		const specialCharacters = "¬∧∨"
+		if (specialCharacters.includes(operator)) {
+			switch(operator) {
+				case '¬': return 'not'
+				case '∧': return 'and'
+				case '∨': return 'or'
+			}
+		}
+		return operator
+	}
+
+	function createCondition(comparisons) {
+		let expressions = []
+
+		function recBuildCondition(idx) {
+			const comp = comparisons[idx]
+
+			if (!comp) return 
+
+			const { attribute, operator, value, nextOperator } = comp
+			const booleanExp = createComparison(attribute, getOperatorString(operator), value)
+			expressions.push(booleanExp)
+			if (nextOperator) {
+				const exp = createBooleanExpression(getOperatorString(nextOperator), [booleanExp, recBuildCondition(idx+1)])
+				return exp
+			}
+
+			return booleanExp
+		}
+
+		const conditionExp = recBuildCondition(0)
+		return  conditionExp
 	}
 }
 
@@ -137,20 +173,25 @@ alias = ws ident: identifier ws {
 	return ident
 }
 
-condition = ws comp: comparison ws {
-	return comp
+condition = ws comps: comparison+ ws {
+	return createCondition(comps)
 }
 
-comparison = att: attribute ws op: operator ws val: value {
-	return createComparison(att, op, val)
+comparison = att: attribute ws op: operator ws val: value ws next_op: operator? {
+	return {
+		attribute: att,
+		operator: op,
+		value: val,
+		nextOperator: next_op
+	}
 }
 
-operator = ("=" / "!=" / "<" / "<=" / ">" / ">=")
+operator = ("=" / "!=" / "<" / "<=" / ">" / ">=" / "∨" / "∧" / "¬" / "or" / "and" / "not")
 
 value = (string / number)
 
 string = "'" chs: [a-zA-Z_.]* "'" {
-	return chs
+	return chs.join(',')
 }
 
 
