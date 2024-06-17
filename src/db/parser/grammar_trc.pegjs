@@ -1,133 +1,28 @@
+
 {
-	function createRoot(child) {
-		return {
-			type: 'trcRoot',
-			child,
-			child2: undefined
-		}
-	}
-
-  function createProjection(attributes) {
-		let relation = ''
-		let columns = []
-
-		if (attributes[0].includes('.')) {
-			relation = attributes[0].split('.')[0]
-		} else {
-			relation = attributes[0]
-			attributes.shift()
-		}
-
-
-		attributes.forEach(att => columns.push(att.split('.')[1]))
-
-		return { 
-			type: 'projection',
-			relation,
-			columns
-		}
+  function createRelationPredicate(relation, variable) {
+    return { type: 'RelationPredicate', relation, variable };
   }
 
-	function createExpression(projection, predicate) {
-		return {
-			type: 'expression',
-			projection,
-			predicate,
-		}
-	}
+  function createPredicate(left, operator, right) {
+    return { type: 'Predicate', left, operator, right };
+  }
 
-	function createPredicate(quantifier, relation, relationAlias, condition) {
-		return {
-			type: 'predicate',
-			quantifier,
-			relation,
-			relationAlias,
-			condition,
-		}
-	}
+  function createLogicalExpression(left, operator, right) {
+    return { type: 'LogicalExpression', left, operator, right };
+  }
 
-	function createBooleanExpression(operator, expressions) {
-		return {
-			type: 'valueExpr',
-			datatype: 'boolean',
-			func: operator,
-			args: expressions,
-		}
-	}
+  function createQuantifiedExpression(quantifier, variable, formula) {
+    return { type: 'QuantifiedExpression', quantifier, variable, formula };
+  }
 
-	function createConstantExpression(datatype, value) {
-		return {
-			type: 'valueExpr',
-			datatype,
-			func: 'constant',
-			args: [value],
-		}
-	}
-
-	function createColumnValueExpression(column) {
-		return {
-			type: 'valueExpr',
-			datatype: 'null',
-			func: 'columnValue',
-			args: [column, null],
-		}
-	}
-
-		// type: 'valueExpr',
-		// child: undefined,
-		// child2: undefined,
-		// assignments: undefined,
-		// datatype: 'string' | 'boolean' | 'number' | 'null' | 'date',
-		// func: relalgAst.ValueExprFunction,
-		// args: valueExpr[] | any[],
-
-
-	function createComparison(attribute, operator, value) {
-		const valueDataType = typeof value === 'number' ? 'number' : 'string'
-		const columnName = attribute.split('.')[1]
-		const columnExp = createColumnValueExpression(columnName)
-		const constExp = createConstantExpression(valueDataType, value)
-		return createBooleanExpression(operator, [columnExp, constExp])
-	}
-
-	function getOperatorString(operator) {
-		const specialCharacters = "¬∧∨"
-		if (specialCharacters.includes(operator)) {
-			switch(operator) {
-				case '¬': return 'not'
-				case '∧': return 'and'
-				case '∨': return 'or'
-			}
-		}
-		return operator
-	}
-
-	function createCondition(comparisons) {
-		let expressions = []
-
-		function recBuildCondition(idx) {
-			const comp = comparisons[idx]
-
-			if (!comp) return 
-
-			const { attribute, operator, value, nextOperator } = comp
-			const booleanExp = createComparison(attribute, getOperatorString(operator), value)
-			expressions.push(booleanExp)
-			if (nextOperator) {
-				const exp = createBooleanExpression(getOperatorString(nextOperator), [booleanExp, recBuildCondition(idx+1)])
-				return exp
-			}
-
-			return booleanExp
-		}
-
-		const conditionExp = recBuildCondition(0)
-		return  conditionExp
-	}
+  function createNegation(formula) {
+    return { type: 'Negation', formula };
+  }
 }
 
-start = r: root {
-	return r
+start = expr: TRC_Expr {
+	return expr
 }
 
 dbDumpStart = dbDumpRoot
@@ -139,80 +34,88 @@ dbDumpRoot = a: all {
 	}
 }
 
-root = exp: expression {
-	return createRoot(exp)
-}
-
-expression = '{' proj: projection '|' pred: predicate '}' {
-	return createExpression(proj, pred)
-}
-
-projection =  atts: attributes {
-	return createProjection(atts)
-}
-
-attributes = first: attribute remain: attribute_list {
-   return [first, ...remain]
-}
-
-attribute_list = atts: (',' attribute)* {
-  return atts.flat().filter(att => att !== ',')
-}
-
-attribute = ws ident: identifier ws {
-	return ident
-}
-
-predicate = ws qnt: quantifier al: alias '∈' rel: relation '(' cond: condition ')' ws {
-	return createPredicate(qnt, rel, al, cond)
-}
-
-quantifier = ("∃" / "∀")
-
-alias = ws ident: identifier ws {
-	return ident
-}
-
-condition = ws comps: comparison+ ws {
-	return createCondition(comps)
-}
-
-comparison = att: attribute ws op: operator ws val: value ws next_op: operator? {
-	return {
-		attribute: att,
-		operator: op,
-		value: val,
-		nextOperator: next_op
-	}
-}
-
-operator = ("=" / "!=" / "<" / "<=" / ">" / ">=" / "∨" / "∧" / "¬" / "or" / "and" / "not")
-
-value = (string / number)
-
-string = "'" chs: [a-zA-Z_.]* "'" {
-	return chs.join(',')
-}
-
-
-digit = [0-9]
-number = dgs: digit+ {
-	return Number(dgs.join(''))
-}
-
-
-relation = ws ident: identifier ws {
-	return ident
-}
-
-ch = [a-zA-Z0-9_.]
-
-identifier = chars: ch+ {
-   return chars.join('')
-}
-
 all = chs: .* {
-    return chs.join('')
+  return chs.join('')
 }
 
-ws "whitespace" = [ \t\n\r]*
+TRC_Expr
+  = '{' _ variable:Variable _ '|' _ formula:Formula _ '}' {
+      return { type: 'TRC_Expr', variable, formula };
+    }
+
+Formula
+  = head:Disjunction tail:(_ 'OR' _ Disjunction)* {
+      return tail.reduce((result, element) => {
+        return createLogicalExpression(result, 'OR', element[3]);
+      }, head);
+    }
+
+Disjunction
+  = head:Conjunction tail:(_ 'AND' _ Conjunction)* {
+      return tail.reduce((result, element) => {
+        return createLogicalExpression(result, 'AND', element[3]);
+      }, head);
+    }
+
+Conjunction
+  = 'NOT' _ formula:Conjunction {
+      return createNegation(formula);
+    }
+  / '(' _ formula:Formula _ ')' {
+      return formula;
+    }
+  / 'EXISTS' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+      return createQuantifiedExpression('EXISTS', variable, formula);
+    }
+  / 'FORALL' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+      return createQuantifiedExpression('FORALL', variable, formula);
+    }
+  / RelationPredicate
+  / Predicate
+
+RelationPredicate
+  = relation:Relation '(' variable:Variable ')' {
+      return createRelationPredicate(relation, variable);
+    }
+
+Predicate
+  = left:AttributeReference _ operator:RelOp _ right:Value {
+      return createPredicate(left, operator, right);
+    }
+  / left:AttributeReference _ operator:RelOp _ right:AttributeReference {
+      return createPredicate(left, operator, right);
+    }
+
+AttributeReference
+  = variable:Variable '.' attribute:Attribute {
+      return { type: 'AttributeReference', variable, attribute };
+    }
+
+RelOp
+  = '=' / '!=' / '<' / '>' / '<=' / '>='
+
+Variable
+  = [a-zA-Z_][a-zA-Z0-9_]* {
+      return text();
+    }
+
+Attribute
+  = [a-zA-Z_][a-zA-Z0-9_]* {
+      return text();
+    }
+
+Value
+  = '"' chars:[^"]* '"' {
+      return chars.join('');
+    }
+  / digits:[0-9]+ {
+      return parseInt(digits.join(''), 10);
+    }
+
+Relation
+  = [a-zA-Z_][a-zA-Z0-9_]* {
+      return text();
+    }
+
+_ "whitespace"
+  = [ \t\n\r]*
