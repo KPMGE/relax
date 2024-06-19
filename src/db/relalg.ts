@@ -138,7 +138,7 @@ export function queryWithReplacedOperatorsFromAst(
 
 const pegParserTrc = require('./parser/grammar_trc.pegjs') as any;
 
-export function parseTRCSelect(text: string): trcAst.rootTrc {
+export function parseTRCSelect(text: string): trcAst.TRC_Expr {
 
 	return pegParserTrc.parse(
 		text,
