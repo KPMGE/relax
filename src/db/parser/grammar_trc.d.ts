@@ -1,8 +1,8 @@
 
 declare namespace trcAst {
 	type Operator = '=' | '!=' | '<' | '>' | '<=' | '>='
-	type Quantifier = 'EXISTS' | 'FORALL' | '∃' | '∀'
-	type LogicalOperator = 'OR' | 'AND' | '∧' | '∨' 
+	type Quantifier = 'exists' | 'forAll'
+	type LogicalOperator = 'or' | 'and'
 
 	interface TRC_Expr {
 		type: 'TRC_Expr',

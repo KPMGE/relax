@@ -44,31 +44,37 @@ TRC_Expr
     }
 
 Formula
-  = head:Disjunction tail:(_ 'OR' _ Disjunction)* {
+  = head:Disjunction tail:(_ ('or' / '∨') _ Disjunction)* {
       return tail.reduce((result, element) => {
-        return createLogicalExpression(result, 'OR', element[3]);
+        return createLogicalExpression(result, 'or', element[3]);
       }, head);
     }
 
 Disjunction
-  = head:Conjunction tail:(_ 'AND' _ Conjunction)* {
+  = head:Conjunction tail:(_ ('and' / '∧') _ Conjunction)* {
       return tail.reduce((result, element) => {
-        return createLogicalExpression(result, 'AND', element[3]);
+        return createLogicalExpression(result, 'and', element[3]);
       }, head);
     }
 
 Conjunction
-  = 'NOT' _ formula:Conjunction {
+  = 'not' _ formula:Conjunction {
       return createNegation(formula);
     }
   / '(' _ formula:Formula _ ')' {
       return formula;
     }
-  / 'EXISTS' _ variable:Variable _ '(' _ formula:Formula _ ')' {
-      return createQuantifiedExpression('EXISTS', variable, formula);
+  / 'exists' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+      return createQuantifiedExpression('exists', variable, formula);
     }
-  / 'FORALL' _ variable:Variable _ '(' _ formula:Formula _ ')' {
-      return createQuantifiedExpression('FORALL', variable, formula);
+  / '∃' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+      return createQuantifiedExpression('exists', variable, formula);
+    }
+  / 'forAll' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+      return createQuantifiedExpression('forAll', variable, formula);
+    }
+  / '∀' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+      return createQuantifiedExpression('forAll', variable, formula);
     }
   / RelationPredicate
   / Predicate
