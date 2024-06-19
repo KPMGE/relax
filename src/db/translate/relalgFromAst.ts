@@ -16,7 +16,7 @@ import { AntiJoin } from '../exec/joins/AntiJoin';
 import { CrossJoin } from '../exec/joins/CrossJoin';
 import { FullOuterJoin } from '../exec/joins/FullOuterJoin';
 import { InnerJoin } from '../exec/joins/InnerJoin';
-import { JoinCondition } from '../exec/joins/Join';
+import { JoinCondition, Join } from '../exec/joins/Join';
 import { LeftOuterJoin } from '../exec/joins/LeftOuterJoin';
 import { RightOuterJoin } from '../exec/joins/RightOuterJoin';
 import { SemiJoin } from '../exec/joins/SemiJoin';
@@ -53,43 +53,97 @@ function parseJoinCondition(condition: relalgAst.booleanExpr | string[] | null):
 }
 
 // translate a TRC-AST to RA
-export function relalgFromTRCAstRoot(astRoot: trcAst.rootTrc, relations: { [key: string]: Relation }): RANode {
-	function rec(nRaw: trcAst.astNode | any): RANode {
-		let node: RANode | null = null
+export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations: { [key: string]: Relation }): RANode {
+	// NOTE: this is map from tuple variable names to relation names
+	let references = new Map<string, string>()
 
-		switch (nRaw.type) {
-			case 'expression': {
-				const projection = nRaw.projection
-				const predicate = nRaw.predicate
-
-				const relation = relations[projection.relation].copy()
-				const columns = projection.columns.map((colName: string) => new Column(colName, null))
-
-				// where
-				const selection = new Selection(relation, recValueExpr(predicate.condition))
-
-				// select *
-				if (columns.length === 0) {
-					node = selection
-				} else {
-					// select <cols..>
-					node = new Projection(selection, columns)
-				}
-			} break;
-
-			default:
-				throw new Error(`type ${nRaw.type} not implemented`);
+	function convertPredicate(predicate: trcAst.Predicate): relalgAst.valueExpr {
+		const leftArg: relalgAst.valueExpr = {
+			type: 'valueExpr',
+			datatype: 'null',
+			func: 'columnValue',
+			args: [
+				predicate.left.attribute,
+				null
+			],
+			codeInfo: null as any
 		}
 
-
-		if (!node) {
-			throw new Error(`Should not happen`);
+		// TODO: add datatype info on the predicate 'AtrributeReference' node
+		const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
+		const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
+		const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
+		const rightArg: relalgAst.valueExpr = {
+			type: 'valueExpr',
+			datatype,
+			func,
+			args: [arg, null],
+			codeInfo: null as any
 		}
 
-		return node
+		const expr: relalgAst.valueExpr = {
+			type: 'valueExpr',
+			datatype: 'boolean',
+			func: predicate.operator,
+			args: [leftArg, rightArg],
+			codeInfo: null as any
+		}
+
+		return expr
 	}
 
-	return rec(astRoot.child)
+	function rec(nRaw: trcAst.TRC_Expr | any): any {
+		switch (nRaw.type) {
+			case 'TRC_Expr':
+				return rec(nRaw.formula)
+
+			case 'LogicalExpression':
+				const left = rec(nRaw.left) as any
+				const right = rec(nRaw.right) as any
+
+				return new InnerJoin(left, right, {
+					type: 'natural',
+					restrictToColumns: null,
+				})
+
+			// TODO: handle the two quantifiers separately
+			// NOTE: for now, it's assumed the expression is using EXISTS
+			case 'QuantifiedExpression':
+				return rec(nRaw.formula)
+
+			case 'RelationPredicate':
+				references.set(nRaw.variable, nRaw.relation)
+				return relations[nRaw.relation].copy()
+			// break
+
+			case 'Negation':
+				// TODO: Not implemented
+				break
+
+			case 'Predicate':
+				const leftRelationName = references.get(nRaw.left.variable)
+				if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.left.variable}`)
+				const leftRelation = relations[leftRelationName].copy()
+
+				// NOTE: that means we're dealing with a join
+				if (nRaw.right.type === 'AttributeReference') {
+					const rightRelationName = references.get(nRaw.right.variable)
+					if (!rightRelationName) throw new Error(`Could not find relation with name: ${nRaw.right.variable}`)
+					const rightRelation = relations[rightRelationName].copy()
+
+					const join = new InnerJoin(leftRelation, rightRelation, {
+						type: 'theta',
+						joinExpression: recValueExpr(convertPredicate(nRaw)),
+					})
+
+					return join
+				}
+
+				return new Selection(leftRelation, recValueExpr(convertPredicate(nRaw)))
+		}
+	}
+
+	return rec(astRoot)
 }
 
 
