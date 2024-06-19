@@ -97,9 +97,13 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			case 'TRC_Expr':
 				return rec(nRaw.formula)
 
-			case 'LogicalExpression':
+			case 'LogicalExpression': 
 				const left = rec(nRaw.left) as any
 				const right = rec(nRaw.right) as any
+
+				if (nRaw.operator === 'or') {
+					return new Union(left, right)
+				}
 
 				return new InnerJoin(left, right, {
 					type: 'natural',
