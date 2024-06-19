@@ -93,13 +93,22 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	}
 
 	let tupleVariable = ''
+	let tupleVariableColumns: ProjectionColumn[] = []
 	function rec(nRaw: trcAst.TRC_Expr | any): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr':
 				tupleVariable = nRaw.variable
+				const relationName = nRaw.formula.relation ? nRaw.formula.relation : nRaw.formula.left.relation
+				const tupleVariableColumNames = relations[relationName].copy().getSchema().getColumns().map(c => c.getName())
+				tupleVariableColumns = tupleVariableColumNames.map(c => new Column(c, relationName))
+
+				if (nRaw.projections.length !== 0) {
+					return new Projection(rec(nRaw.formula), nRaw.projections.map(c => new Column(c, relationName)))
+				}
+
 				return rec(nRaw.formula)
 
-			case 'LogicalExpression': 
+			case 'LogicalExpression':
 				const left = rec(nRaw.left) as any
 				const right = rec(nRaw.right) as any
 
@@ -107,10 +116,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					return new Union(left, right)
 				}
 
-				return new InnerJoin(left, right, {
+				const join = new InnerJoin(left, right, {
 					type: 'natural',
 					restrictToColumns: null,
 				})
+
+				return new Projection(join, tupleVariableColumns)
 
 			// TODO: handle the two quantifiers separately
 			// NOTE: for now, it's assumed the expression is using EXISTS
@@ -123,6 +134,8 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			// break
 
 			case 'Negation':
+				if (nRaw.formula.type !== 'Predicate') throw new Error(`Negated expression must be a predicate!`)
+
 				const tupleVariableRelationName = references.get(tupleVariable)
 				if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariable}`)
 				const tupleVariableRelation = relations[tupleVariableRelationName].copy()
@@ -144,10 +157,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						joinExpression: recValueExpr(convertPredicate(nRaw)),
 					})
 
-					return join
+					return new Projection(join, tupleVariableColumns)
 				}
 
-				return new Selection(leftRelation, recValueExpr(convertPredicate(nRaw)))
+				const selection = new Selection(leftRelation, recValueExpr(convertPredicate(nRaw)))
+				return new Projection(selection, tupleVariableColumns)
 		}
 	}
 
