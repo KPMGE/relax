@@ -40,8 +40,14 @@ all = chs: .* {
 
 TRC_Expr
   = '{' _ variable:Variable _ '|' _ formula:Formula _ '}' {
-      return { type: 'TRC_Expr', variable, formula };
+      return { type: 'TRC_Expr', variable, formula, projections: [] };
     }
+		/
+		'{' _ projections:Projections _ '|' _ formula:Formula _ '}' {
+			const variable = projections[0].variable
+			const attributeNames = projections.map(p => p.attribute)
+      return { type: 'TRC_Expr', variable, formula, projections: attributeNames };
+		}
 
 Formula
   = head:Disjunction tail:(_ ('or' / '∨') _ Disjunction)* {
@@ -121,6 +127,16 @@ Value
 Relation
   = [a-zA-Z_][a-zA-Z0-9_]* {
       return text();
+    }
+
+Projections
+  = p: Projection pl: ("," _ Projection)* {
+      return [p].concat(pl.map(p => p[2]))
+    }
+
+Projection
+  = variable:Variable "." attribute:Variable {
+      return { variable, attribute }
     }
 
 _ "whitespace"

@@ -6,6 +6,7 @@ declare namespace trcAst {
 	interface TRC_Expr {
 		type: 'TRC_Expr',
 		variable: string,
+		projections: string[]
 		formula: LogicalExpression
 	}
 
