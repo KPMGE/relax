@@ -92,9 +92,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return expr
 	}
 
+	let tupleVariable = ''
 	function rec(nRaw: trcAst.TRC_Expr | any): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr':
+				tupleVariable = nRaw.variable
 				return rec(nRaw.formula)
 
 			case 'LogicalExpression': 
@@ -121,8 +123,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			// break
 
 			case 'Negation':
-				// TODO: Not implemented
-				break
+				const tupleVariableRelationName = references.get(tupleVariable)
+				if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariable}`)
+				const tupleVariableRelation = relations[tupleVariableRelationName].copy()
+				return new Difference(tupleVariableRelation, rec(nRaw.formula))
 
 			case 'Predicate':
 				const leftRelationName = references.get(nRaw.left.variable)
