@@ -103,7 +103,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				tupleVariableColumns = tupleVariableColumNames.map(c => new Column(c, relationName))
 
 				if (nRaw.projections.length !== 0) {
-					return new Projection(rec(nRaw.formula), nRaw.projections.map(c => new Column(c, relationName)))
+					return new Projection(rec(nRaw.formula), nRaw.projections.map((c: string) => new Column(c, relationName)))
 				}
 
 				return rec(nRaw.formula)
@@ -121,7 +121,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					restrictToColumns: null,
 				})
 
-				return new Projection(join, tupleVariableColumns)
+				return join
 
 			// TODO: handle the two quantifiers separately
 			// NOTE: for now, it's assumed the expression is using EXISTS
@@ -134,12 +134,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			// break
 
 			case 'Negation':
-				if (nRaw.formula.type !== 'Predicate') throw new Error(`Negated expression must be a predicate!`)
+				// if (nRaw.formula.type !== 'Predicate') throw new Error(`Negated expression must be a predicate!`)
 
 				const tupleVariableRelationName = references.get(tupleVariable)
 				if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariable}`)
 				const tupleVariableRelation = relations[tupleVariableRelationName].copy()
-				return new Difference(tupleVariableRelation, rec(nRaw.formula))
+				return new Difference(tupleVariableRelation, new Projection(rec(nRaw.formula), tupleVariableColumns))
 
 			case 'Predicate':
 				const leftRelationName = references.get(nRaw.left.variable)
@@ -157,11 +157,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						joinExpression: recValueExpr(convertPredicate(nRaw)),
 					})
 
-					return new Projection(join, tupleVariableColumns)
+					return join
 				}
 
 				const selection = new Selection(leftRelation, recValueExpr(convertPredicate(nRaw)))
-				return new Projection(selection, tupleVariableColumns)
+				return selection
 		}
 	}
 
