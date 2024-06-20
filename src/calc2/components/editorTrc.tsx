@@ -120,12 +120,6 @@ export class EditorTrc extends React.Component<Props> {
 								tooltip: 'calc.editors.trc.toolbar.not',
 								onClick: item => this.replaceText(item, '¬'),
 							},
-							{
-								label: '∅',
-								tooltipTitle: 'calc.editors.trc.toolbar.empty',
-								tooltip: 'calc.editors.trc.toolbar.empty',
-								onClick: item => this.replaceText(item, '∅'),
-							},
 						],
 					},
 					{
