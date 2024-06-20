@@ -98,11 +98,6 @@ CodeMirror.defineMode('trc', function () {
 				}
 				return 'inlineRelation';
 			}
-			else if (stream.match(/^{/, true)) {
-				state.inInlineRelation = true;
-				return 'inlineRelation';
-			}
-
 			else if (stream.match(/^--[\t ]/, true)) {
 				stream.skipToEnd();
 				return 'comment';
