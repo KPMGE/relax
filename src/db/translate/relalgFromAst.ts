@@ -94,11 +94,22 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 	let tupleVariable = ''
 	let tupleVariableColumns: ProjectionColumn[] = []
+
+	function getTupleVariableRelation(node: trcAst.TRC_Expr | any): string | undefined {
+		switch (node.type) {
+			case 'TRC_Expr': return getTupleVariableRelation(node.formula)
+			case 'RelationPredicate': 
+				return node.relation
+			case 'LogicalExpression': return getTupleVariableRelation(node.left)
+		}
+	}
+
 	function rec(nRaw: trcAst.TRC_Expr | any): any {
 		switch (nRaw.type) {
-			case 'TRC_Expr':
+			case 'TRC_Expr': {
 				tupleVariable = nRaw.variable
-				const relationName = nRaw.formula.relation ? nRaw.formula.relation : nRaw.formula.left.relation
+				const relationName = getTupleVariableRelation(nRaw)
+				if (!relationName) throw new Error('Could not find tuple relation name!')
 				const tupleVariableColumNames = relations[relationName].copy().getSchema().getColumns().map(c => c.getName())
 				tupleVariableColumns = tupleVariableColumNames.map(c => new Column(c, relationName))
 
@@ -107,8 +118,9 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				}
 
 				return rec(nRaw.formula)
+			}
 
-			case 'LogicalExpression':
+			case 'LogicalExpression': {
 				const left = rec(nRaw.left) as any
 				const right = rec(nRaw.right) as any
 
@@ -122,26 +134,33 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				})
 
 				return join
+			}
 
 			// TODO: handle the two quantifiers separately
 			// NOTE: for now, it's assumed the expression is using EXISTS
-			case 'QuantifiedExpression':
+			case 'QuantifiedExpression': {
 				return rec(nRaw.formula)
+			}
 
-			case 'RelationPredicate':
+			case 'RelationPredicate': {
 				references.set(nRaw.variable, nRaw.relation)
 				return relations[nRaw.relation].copy()
-			// break
+			}
 
-			case 'Negation':
+			case 'Negation': {
 				// if (nRaw.formula.type !== 'Predicate') throw new Error(`Negated expression must be a predicate!`)
 
 				const tupleVariableRelationName = references.get(tupleVariable)
 				if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariable}`)
 				const tupleVariableRelation = relations[tupleVariableRelationName].copy()
-				return new Difference(tupleVariableRelation, new Projection(rec(nRaw.formula), tupleVariableColumns))
+				const join = new InnerJoin(tupleVariableRelation, rec(nRaw.formula), {
+					type: 'natural',
+					restrictToColumns: null
+				})
+				return new Difference(tupleVariableRelation, new Projection(join, tupleVariableColumns))
+			}
 
-			case 'Predicate':
+			case 'Predicate': {
 				const leftRelationName = references.get(nRaw.left.variable)
 				if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.left.variable}`)
 				const leftRelation = relations[leftRelationName].copy()
@@ -162,6 +181,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 				const selection = new Selection(leftRelation, recValueExpr(convertPredicate(nRaw)))
 				return selection
+			}
 		}
 	}
 
