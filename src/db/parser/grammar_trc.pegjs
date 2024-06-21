@@ -49,41 +49,39 @@ TRC_Expr
       return { type: 'TRC_Expr', variable, formula, projections: attributeNames };
 		}
 
-Formula
-  = head:Disjunction tail:(_ ('or' / '∨') _ Disjunction)* {
-      return tail.reduce((result, element) => {
-        return createLogicalExpression(result, 'or', element[3]);
-      }, head);
-    }
+Formula = Conjunction / Disjunction / BaseFormula
+
+AtomicFormula = RelationPredicate / Predicate
 
 Disjunction
-  = head:Conjunction tail:(_ ('and' / '∧') _ Conjunction)* {
-      return tail.reduce((result, element) => {
-        return createLogicalExpression(result, 'and', element[3]);
-      }, head);
+  = left:BaseFormula right:(_ ('or' / '∨') _ BaseFormula)+ {
+      return right.reduce((result, element) => {
+        return createLogicalExpression(result, 'or', element[3]);
+      }, left);
     }
 
 Conjunction
-  = 'not' _ formula:Conjunction {
+  = left:BaseFormula right:(_ ('and' / '∧') _ BaseFormula)+ {
+      return right.reduce((result, element) => {
+        return createLogicalExpression(result, 'and', element[3]);
+      }, left);
+    }
+
+BaseFormula 
+	=	AtomicFormula 
+	/
+	'not' _ formula:BaseFormula {
       return createNegation(formula);
     }
   / '(' _ formula:Formula _ ')' {
       return formula;
     }
-  / 'exists' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+  / ('exists' / '∃') _ variable:Variable _ '(' _ formula:Formula _ ')' {
       return createQuantifiedExpression('exists', variable, formula);
     }
-  / '∃' _ variable:Variable _ '(' _ formula:Formula _ ')' {
-      return createQuantifiedExpression('exists', variable, formula);
-    }
-  / 'forAll' _ variable:Variable _ '(' _ formula:Formula _ ')' {
+  / ('forAll' / '∀') _ variable:Variable _ '(' _ formula:Formula _ ')' {
       return createQuantifiedExpression('forAll', variable, formula);
     }
-  / '∀' _ variable:Variable _ '(' _ formula:Formula _ ')' {
-      return createQuantifiedExpression('forAll', variable, formula);
-    }
-  / RelationPredicate
-  / Predicate
 
 RelationPredicate
   = relation:Relation '(' variable:Variable ')' {
@@ -117,7 +115,7 @@ Attribute
     }
 
 Value
-  = '"' chars:[^"]* '"' {
+  = "'" chars:[^']* "\'" {
       return chars.join('');
     }
   / digits:[0-9]+ {
