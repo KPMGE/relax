@@ -95,20 +95,40 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	let tupleVariable = ''
 	let tupleVariableColumns: ProjectionColumn[] = []
 
-	function getTupleVariableRelation(node: trcAst.TRC_Expr | any): string | undefined {
+	function getFirstRelation(node: any): string | undefined {
 		switch (node.type) {
-			case 'TRC_Expr': return getTupleVariableRelation(node.formula)
-			case 'RelationPredicate': 
+			case 'TRC_Expr': return getFirstRelation(node.formula)
+			case 'RelationPredicate':
 				return node.relation
-			case 'LogicalExpression': return getTupleVariableRelation(node.left)
+			case 'LogicalExpression': return getFirstRelation(node.left)
 		}
 	}
+
+	function usesVariableInPredicate(node: any, variable: string): boolean {
+		switch (node.type) {
+			// if we encounter another quantified expression, we know we should stop
+			// looking for the variable, as we're now entering a whole new formula
+			case 'QuantifiedExpression': return false
+			case 'LogicalExpression': {
+				const left = usesVariableInPredicate(node.left, variable)
+				const right = usesVariableInPredicate(node.right, variable)
+				return left || right
+			}
+			case 'Predicate': {
+				if (node.left?.variable === variable || node.left?.variable === variable) {
+					return true
+				}
+				return false
+			}
+		}
+	}
+
 
 	function rec(nRaw: trcAst.TRC_Expr | any): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
 				tupleVariable = nRaw.variable
-				const relationName = getTupleVariableRelation(nRaw)
+				const relationName = getFirstRelation(nRaw)
 				if (!relationName) throw new Error('Could not find tuple relation name!')
 				const tupleVariableColumNames = relations[relationName].copy().getSchema().getColumns().map(c => c.getName())
 				tupleVariableColumns = tupleVariableColumNames.map(c => new Column(c, relationName))
@@ -122,24 +142,53 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 			case 'LogicalExpression': {
 				const left = rec(nRaw.left) as any
-				const right = rec(nRaw.right) as any
+				let right = rec(nRaw.right) as any
 
 				if (nRaw.operator === 'or') {
 					return new Union(left, right)
 				}
 
-				const join = new InnerJoin(left, right, {
-					type: 'natural',
-					restrictToColumns: null,
-				})
+				return new SemiJoin(left, right, true)
 
-				return join
+				// const join = new InnerJoin(left, right, {
+				// 	type: 'natural',
+				// 	restrictToColumns: null,
+				// })
+
+				// return join
 			}
 
 			// TODO: handle the two quantifiers separately
 			// NOTE: for now, it's assumed the expression is using EXISTS
 			case 'QuantifiedExpression': {
-				return rec(nRaw.formula)
+				const resultFormula = rec(nRaw.formula)
+				const uses = usesVariableInPredicate(nRaw.formula, tupleVariable)
+				if (!uses) {
+					const aggregate = [
+						{
+							aggFunction: "COUNT_ALL",
+							col: null,
+							name: "c"
+						}
+					]
+
+					const condition: trcAst.Predicate = {
+						type: 'Predicate',
+						left: {
+							type: 'AttributeReference',
+							variable: tupleVariable,
+							attribute: 'c'
+						},
+						operator: '>',
+						right: 0
+					}
+
+					// count = gamma count(*)->c(resultFormula)
+					const count = new GroupBy(resultFormula, [], aggregate as any)
+					// sigma c > 0 (count)
+					return new Selection(count, recValueExpr(convertPredicate(condition)))
+				}
+
 			}
 
 			case 'RelationPredicate': {
@@ -148,7 +197,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Negation': {
-				// if (nRaw.formula.type !== 'Predicate') throw new Error(`Negated expression must be a predicate!`)
+				if (nRaw.formula.type !== 'RelationPredicate') throw new Error('Cannot negate a relation!')
 
 				const tupleVariableRelationName = references.get(tupleVariable)
 				if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariable}`)
