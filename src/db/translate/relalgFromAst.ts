@@ -92,6 +92,16 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return expr
 	}
 
+	function setupReferences(root: any) {
+		switch (root.type) {
+			case 'TRC_Expr': { setupReferences(root.formula) } break
+			case 'RelationPredicate': { references.set(root.variable, root.relation) } break
+			case 'Negation': { setupReferences(root.formula) } break
+			case 'QuantifiedExpression': { setupReferences(root.formula) } break
+			case 'LogicalExpression': {  setupReferences(root.left); setupReferences(root.right)} break
+		}
+	}
+
 	function getFirstRelation(node: any): string | null {
 		switch (node.type) {
 			case 'TRC_Expr': return getFirstRelation(node.formula)
@@ -115,6 +125,22 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'LogicalExpression': {
+				// NOTE: p → q ≡ ¬p ∨ q
+				if (nRaw.operator === 'implies') {
+					const notLeft = {
+						type: 'Negation',
+						formula: nRaw.left
+					}
+
+					if (nRaw.left.type === 'RelationPredicate') {
+						return rec(nRaw.right, tupleVariable) as RANode
+					}
+
+					const left = rec(notLeft, tupleVariable) as RANode
+					const right = rec(nRaw.right, tupleVariable) as RANode
+					return new Union(left, right)
+				}
+
 				const left = rec(nRaw.left, tupleVariable) as RANode
 				const right = rec(nRaw.right, tupleVariable) as RANode
 
@@ -237,6 +263,23 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 								return rec(and, tupleVariable, true)
 							} 
 
+							// ¬(A → B) ≡ A ∧ ¬B
+							case 'implies': {
+								const and = {
+									type: 'LogicalExpression',
+									left: nRaw.formula.left,
+									operator: 'and',
+									right: notRight
+								}
+
+								// NOTE: we can't negate a RelationPredicate
+								if (nRaw.formula.left.type === 'RelationPredicate') {
+									return rec(notRight, tupleVariable, true)
+								}
+
+								return rec(and, tupleVariable, true)
+							}
+
 							default: 
 								throw new Error('Unreachable')
 						}
@@ -272,6 +315,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		}
 	}
 
+	setupReferences(astRoot)
 	return rec(astRoot)
 }
 

@@ -67,13 +67,6 @@ LogicalExpression
 	= left:BaseFormula right:(_ LogicOp _ BaseFormula)* {
       return right.reduce((result, element) => {
 			  const op = translateOperator(element[1])
-
-				if (op === 'implies') {
-					// NOTE: p → q ≡ ¬p ∨ q
-					const negated = createNegation(result)
-					return createLogicalExpression(negated, 'or', element[3]);
-				}
-
         return createLogicalExpression(result, op, element[3]);
       }, left);
     }
