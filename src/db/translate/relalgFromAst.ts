@@ -127,7 +127,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 			case 'QuantifiedExpression': {
 				const resultFormula = rec(nRaw.formula, nRaw.variable)
-
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
 					const aggregate = [
@@ -157,10 +156,17 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					// sigma c > 0 (tupleRel x count)
 					return new Selection(new CrossJoin(tupleVariableRelation, count), recValueExpr(convertPredicate(condition)))
 				} else {
-					// TODO: unimplemented
+					// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
+					const negatedFormula = {
+						type: 'Negation',
+						formula: nRaw.formula
+					}
+					const notExists = {
+						type: 'Negation',
+						formula: { ...nRaw, quantifier: 'exists', formula: negatedFormula }
+					}
+					return rec(notExists, tupleVariable, true)
 				}
-
-				return resultFormula
 			}
 
 			case 'RelationPredicate': {
@@ -180,24 +186,60 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					}
 
 					case 'QuantifiedExpression': {
-						if (nRaw.formula.quantifier === 'exists') {
-							return rec(nRaw.formula, tupleVariable, true)
-						} else {
-							// TODO: implement logic for universal quantifier
-						}
+						// NOTE: the negated quantified expression will always be 'exists',
+						// becase the universal quantifier is tranformed into an existencial one
+						return rec(nRaw.formula, tupleVariable, true)
 					}
 
 					case 'LogicalExpression': {
-						// NOTE: the negation of a logic expression can be seen as a negated 
-						// existencial expression
-						// e.g: ¬p ≡ ¬∃(p)
-						const node = {
-							type: 'QuantifiedExpression',
-							quantifier: 'exists',
-							variable: tupleVariable,
-							formula: nRaw.formula 
+						const notLeft = {
+							type: 'Negation',
+							formula: nRaw.formula.left
 						}
-						return rec(node, tupleVariable, true)
+
+						const notRight = {
+							type: 'Negation',
+							formula: nRaw.formula.right
+						}
+
+						switch (nRaw.formula.operator) {
+							// ¬(A ∧ B) ≡ ¬A ∨ ¬B
+							case 'and': {
+								const or = {
+									type: 'LogicalExpression',
+									left: notLeft,
+									operator: 'or',
+									right: notRight
+								}
+
+								// NOTE: we can't negate a RelationPredicate
+								if (nRaw.formula.left.type === 'RelationPredicate') {
+									return rec(notRight, tupleVariable, true)
+								}
+
+								return rec(or, tupleVariable, true)
+							}
+
+							// ¬(A ∨ B) ≡ ¬A ∧ ¬B
+							case 'or': {
+								const and = {
+									type: 'LogicalExpression',
+									left: notLeft,
+									operator: 'and',
+									right: notRight
+								}
+
+								// NOTE: we can't negate a RelationPredicate
+								if (nRaw.formula.left.type === 'RelationPredicate') {
+									return rec(notRight, tupleVariable, true)
+								}
+
+								return rec(and, tupleVariable, true)
+							} 
+
+							default: 
+								throw new Error('Unreachable')
+						}
 					}
 
 					default: 
