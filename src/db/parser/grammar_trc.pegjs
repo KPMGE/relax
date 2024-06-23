@@ -19,6 +19,18 @@
   function createNegation(formula) {
     return { type: 'Negation', formula };
   }
+
+	function translateOperator(op) {
+		const operators = {
+			'or': 'or',
+			'∨': 'or',
+			'and': 'and',
+			'∧': 'and',
+			'implies': 'implies',
+			'→': 'implies',
+		}
+		return operators[op]
+	}
 }
 
 start = expr: TRC_Expr {
@@ -49,23 +61,24 @@ TRC_Expr
       return { type: 'TRC_Expr', variable, formula, projections: attributeNames };
 		}
 
-Formula = Conjunction / Disjunction / BaseFormula
+Formula = LogicalExpression
+
+LogicalExpression 
+	= left:BaseFormula right:(_ LogicOp _ BaseFormula)* {
+      return right.reduce((result, element) => {
+			  const op = translateOperator(element[1])
+
+				if (op === 'implies') {
+					// NOTE: p → q ≡ ¬p ∨ q
+					const negated = createNegation(result)
+					return createLogicalExpression(negated, 'or', element[3]);
+				}
+
+        return createLogicalExpression(result, op, element[3]);
+      }, left);
+    }
 
 AtomicFormula = RelationPredicate / Predicate
-
-Disjunction
-  = left:BaseFormula right:(_ ('or' / '∨') _ BaseFormula)+ {
-      return right.reduce((result, element) => {
-        return createLogicalExpression(result, 'or', element[3]);
-      }, left);
-    }
-
-Conjunction
-  = left:BaseFormula right:(_ ('and' / '∧') _ BaseFormula)+ {
-      return right.reduce((result, element) => {
-        return createLogicalExpression(result, 'and', element[3]);
-      }, left);
-    }
 
 BaseFormula 
 	=	AtomicFormula 
@@ -103,6 +116,8 @@ AttributeReference
 
 RelOp
   = '=' / '!=' / '<=' / '>=' / '<' / '>'
+
+LogicOp = ('or' / '∨' / 'and' / '∧' / 'implies' / '→')
 
 Variable
   = [a-zA-Z_][a-zA-Z0-9_]* {
