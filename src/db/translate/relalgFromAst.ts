@@ -58,13 +58,14 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	let references = new Map<string, string>()
 
 	function convertPredicate(predicate: trcAst.Predicate): relalgAst.valueExpr {
+		const leftRelationName = references.get(predicate.left.variable) ?? null
 		const leftArg: relalgAst.valueExpr = {
 			type: 'valueExpr',
 			datatype: 'null',
 			func: 'columnValue',
 			args: [
 				predicate.left.attribute,
-				null
+				leftRelationName
 			],
 			codeInfo: null as any
 		}
@@ -73,11 +74,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
 		const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
 		const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
+		const rightRelationName = (typeof predicate.right == 'object') ? references.get(predicate.right.variable) : null
 		const rightArg: relalgAst.valueExpr = {
 			type: 'valueExpr',
 			datatype,
 			func,
-			args: [arg, null],
+			args: [arg, rightRelationName],
 			codeInfo: null as any
 		}
 
@@ -112,6 +114,37 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		}
 	}
 
+	function notOperator(op: string): string {
+		const lookupTable: any = {
+			'=': '!=',
+			'!=': '=',
+			'<': '>=',
+			'>': '<=',
+			'<=': '>',
+			'>=': '<'
+		}
+		return lookupTable[op]
+	}
+	
+	function usesVariableInPredicate(node: any, variable: string): boolean {
+		switch (node.type) {
+			// if we encounter another quantified expression, we know we should stop
+			// looking for the variable, as we're now entering a whole new formula
+			case 'LogicalExpression': {
+				const left = usesVariableInPredicate(node.left, variable)
+				const right = usesVariableInPredicate(node.right, variable)
+				return left || right
+			}
+			case 'Predicate': {
+				if (node.left?.variable === variable || node.right?.variable === variable) {
+					return true
+				}
+				return false
+			}
+			default: return false
+		}
+	}
+
 	function rec(nRaw: trcAst.TRC_Expr | any, tupleVariable: string | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
@@ -133,16 +166,16 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					}
 
 					if (nRaw.left.type === 'RelationPredicate') {
-						return rec(nRaw.right, tupleVariable) as RANode
+						return rec(nRaw.right, tupleVariable, negated) as RANode
 					}
 
-					const left = rec(notLeft, tupleVariable) as RANode
 					const right = rec(nRaw.right, tupleVariable) as RANode
+					const left = rec(notLeft, tupleVariable, negated) as RANode
 					return new Union(left, right)
 				}
 
-				const left = rec(nRaw.left, tupleVariable) as RANode
-				const right = rec(nRaw.right, tupleVariable) as RANode
+				const left = rec(nRaw.left, tupleVariable, negated) as RANode
+				const right = rec(nRaw.right, tupleVariable, negated) as RANode
 
 				if (nRaw.operator === 'or') {
 					return new Union(left, right)
@@ -152,9 +185,17 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'QuantifiedExpression': {
-				const resultFormula = rec(nRaw.formula, nRaw.variable)
+				const resultFormula = rec(nRaw.formula, nRaw.variable, negated)
+
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
+					// NOTE: if we use the tuple variable inside the quantified
+					// expression, that means we are actully performing a join
+					const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+					if (uses) {
+						return resultFormula
+					}
+
 					const aggregate = [
 						{
 							aggFunction: "COUNT_ALL",
@@ -191,7 +232,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						type: 'Negation',
 						formula: { ...nRaw, quantifier: 'exists', formula: negatedFormula }
 					}
-					return rec(notExists, tupleVariable, true)
+					return rec(notExists, tupleVariable, negated)
 				}
 			}
 
@@ -204,11 +245,16 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				// NOTE: it means we're negating a predicate, so we can use set difference
 				// NOTE: not(codition(R)) ≡ R - sigma condition(R) 
 				switch(nRaw.formula.type) {
+					case 'Negation': {
+						return rec(nRaw.formula, tupleVariable, false)
+					}
+
 					case 'Predicate': {
-						const leftRelationName = references.get(nRaw.formula.left.variable)
-						if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.formula.left.variable}`)
-						const leftRelation = relations[leftRelationName].copy()
-						return new Difference(leftRelation, rec(nRaw.formula, tupleVariable))
+						return rec(nRaw.formula, tupleVariable, true)
+						// const leftRelationName = references.get(nRaw.formula.left.variable)
+						// if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.formula.left.variable}`)
+						// const leftRelation = relations[leftRelationName].copy()
+						// return new Difference(leftRelation, rec(nRaw.formula, tupleVariable))
 					}
 
 					case 'QuantifiedExpression': {
@@ -291,9 +337,14 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Predicate': {
+				console.log('PREDICATE: ', { negated, tupleVariable, test: nRaw.right.variable })
 				const leftRelationName = references.get(nRaw.left.variable)
 				if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.left.variable}`)
 				const leftRelation = relations[leftRelationName].copy()
+
+				if (negated && nRaw.right.type !== 'AttributeReference') {
+					nRaw.operator = notOperator(nRaw.operator)
+				}
 
 				// NOTE: that means we're dealing with a join
 				if (nRaw.right.type === 'AttributeReference') {
