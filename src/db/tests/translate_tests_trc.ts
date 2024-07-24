@@ -251,4 +251,14 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 		assert.deepEqual(root.getResult(), srcTableR.getResult());
 	});
+
+	QUnit.test('test projection', (assert) => {
+		const queryTrc = '{ t.a, t.b | R(t) }';
+		const queryRa = 'pi a, b (R)'
+
+		const resultTrc = exec_trc(queryTrc).getResult();
+		const resultRa = exec_ra(queryRa).getResult();
+
+		assert.deepEqual(resultTrc, resultRa);
+	});
 });
