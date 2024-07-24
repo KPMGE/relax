@@ -10,7 +10,6 @@ import { Relation } from 'db/exec/Relation';
 import { RANode } from '../exec/RANode';
 import * as relalgjs from '../relalg';
 
-QUnit.module('translate trc ast to relational algebra');
 
 const srcTableR: Relation = relalgjs.executeRelalg(`{
 	R.a, R.b, R.c
@@ -63,86 +62,94 @@ function exec_ra(query: string) {
 	return relalgjs.executeRelalg(query, relations);
 }
 
-QUnit.test('test simple relation', function(assert) {
-	const query = '{ t | R(t) }';
-	const root = exec_trc(query);
 
-	assert.deepEqual(root.getResult(), srcTableR.getResult());
-});
+QUnit.module('translate trc ast to relational algebra', () => {
 
-QUnit.test('test > predicate', function(assert) {
-	const queryTrc = '{ t | R(t) and t.a > 3 }';
-	const queryRa = 'sigma a > 3 (R)';
+	QUnit.module('predicates', () => {
+		QUnit.test('test > predicate', function(assert) {
+			const queryTrc = '{ t | R(t) and t.a > 3 }';
+			const queryRa = 'sigma a > 3 (R)';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = exec_ra(queryRa).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
 
-QUnit.test('test < predicate', function(assert) {
-	const queryTrc = '{ t | R(t) and t.a < 3 }';
-	const queryRa = 'sigma a < 3 (R)';
+		QUnit.test('test < predicate', function(assert) {
+			const queryTrc = '{ t | R(t) and t.a < 3 }';
+			const queryRa = 'sigma a < 3 (R)';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = exec_ra(queryRa).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
 
-QUnit.test('test = predicate', function(assert) {
-	const queryTrc = '{ t | R(t) and t.a = 3 }';
-	const queryRa = 'sigma a = 3 (R)';
+		QUnit.test('test = predicate', function(assert) {
+			const queryTrc = '{ t | R(t) and t.a = 3 }';
+			const queryRa = 'sigma a = 3 (R)';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = exec_ra(queryRa).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
 
-QUnit.test('test <= predicate', function(assert) {
-	const queryTrc = '{ t | R(t) and t.a <= 3 }';
-	const queryRa = 'sigma a <= 3 (R)';
+		QUnit.test('test <= predicate', function(assert) {
+			const queryTrc = '{ t | R(t) and t.a <= 3 }';
+			const queryRa = 'sigma a <= 3 (R)';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = exec_ra(queryRa).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
 
-QUnit.test('test >= predicate', function(assert) {
-	const queryTrc = '{ t | R(t) and t.a >= 3 }';
-	const queryRa = 'sigma a >= 3 (R)';
+		QUnit.test('test >= predicate', function(assert) {
+			const queryTrc = '{ t | R(t) and t.a >= 3 }';
+			const queryRa = 'sigma a >= 3 (R)';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = exec_ra(queryRa).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
 
-QUnit.test('test != predicate', function(assert) {
-	const queryTrc = '{ t | R(t) and t.a != 3 }';
-	const queryRa = 'sigma a != 3 (R)';
+		QUnit.test('test != predicate', function(assert) {
+			const queryTrc = '{ t | R(t) and t.a != 3 }';
+			const queryRa = 'sigma a != 3 (R)';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = exec_ra(queryRa).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
+	})
 
-QUnit.test('given existencial operator with no refence to the tuple variable and true condition, should return all tuples', function(assert) {
-	const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 10) }';
+	QUnit.module('existencial operator(∃)', () => {
+		QUnit.test('given ∃ operator with no tuple variable refence and true condition, should return all tuples', function(assert) {
+			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 10) }';
 
-	const resultTrc = exec_trc(queryTrc).getResult()
-	const resultRa = srcTableR.getResult();
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = srcTableR.getResult();
 
-	assert.deepEqual(resultTrc, resultRa);
-});
+			assert.deepEqual(resultTrc, resultRa);
+		});
 
-QUnit.test('given existencial operator with no refence to the tuple variable and false condition, should return no tuples', function(assert) {
-	const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 1000) }';
+		QUnit.test('given ∃ operator with no tuple variable reference end false condition, should return no tuples', function(assert) {
+			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 1000) }';
 
-	const resultTrc = exec_trc(queryTrc).getResult();
+			const resultTrc = exec_trc(queryTrc).getResult();
 
-	assert.equal(resultTrc.getNumRows(), 0);
+			assert.equal(resultTrc.getNumRows(), 0);
+		});
+	});
+
+	QUnit.test('test simple relation', function(assert) {
+		const query = '{ t | R(t) }';
+		const root = exec_trc(query);
+
+		assert.deepEqual(root.getResult(), srcTableR.getResult());
+	});
 });
