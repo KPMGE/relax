@@ -67,7 +67,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 	QUnit.module('predicates', () => {
 		QUnit.module('negation', () => {
-			QUnit.test('test > predicate negation', function(assert) {
+			QUnit.test('test > predicate negation', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a > 3 }';
 				const queryRa = 'sigma a <= 3 (R)';
 
@@ -77,7 +77,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test < predicate negation', function(assert) {
+			QUnit.test('test < predicate negation', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a < 3 }';
 				const queryRa = 'sigma a >= 3 (R)';
 
@@ -87,7 +87,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test = predicate negation', function(assert) {
+			QUnit.test('test = predicate negation', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a = 3 }';
 				const queryRa = 'sigma a != 3 (R)';
 
@@ -97,7 +97,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test <= predicate negation', function(assert) {
+			QUnit.test('test <= predicate negation', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a <= 3 }';
 				const queryRa = 'sigma a > 3 (R)';
 
@@ -107,7 +107,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test >= predicate negation', function(assert) {
+			QUnit.test('test >= predicate negation', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a >= 3 }';
 				const queryRa = 'sigma a < 3 (R)';
 
@@ -117,7 +117,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test != predicate', function(assert) {
+			QUnit.test('test != predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a != 3 }';
 				const queryRa = 'sigma a = 3 (R)';
 
@@ -128,7 +128,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 		})
 
-		QUnit.test('test > predicate', function(assert) {
+		QUnit.test('test > predicate', (assert) => {
 			const queryTrc = '{ t | R(t) and t.a > 3 }';
 			const queryRa = 'sigma a > 3 (R)';
 
@@ -138,7 +138,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('test < predicate', function(assert) {
+		QUnit.test('test < predicate', (assert) => {
 			const queryTrc = '{ t | R(t) and t.a < 3 }';
 			const queryRa = 'sigma a < 3 (R)';
 
@@ -148,7 +148,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('test = predicate', function(assert) {
+		QUnit.test('test = predicate', (assert) => {
 			const queryTrc = '{ t | R(t) and t.a = 3 }';
 			const queryRa = 'sigma a = 3 (R)';
 
@@ -158,7 +158,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('test <= predicate', function(assert) {
+		QUnit.test('test <= predicate', (assert) => {
 			const queryTrc = '{ t | R(t) and t.a <= 3 }';
 			const queryRa = 'sigma a <= 3 (R)';
 
@@ -168,7 +168,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('test >= predicate', function(assert) {
+		QUnit.test('test >= predicate', (assert) => {
 			const queryTrc = '{ t | R(t) and t.a >= 3 }';
 			const queryRa = 'sigma a >= 3 (R)';
 
@@ -178,7 +178,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('test != predicate', function(assert) {
+		QUnit.test('test != predicate', (assert) => {
 			const queryTrc = '{ t | R(t) and t.a != 3 }';
 			const queryRa = 'sigma a != 3 (R)';
 
@@ -190,7 +190,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	})
 
 	QUnit.module('existencial operator(∃)', () => {
-		QUnit.test('given ∃ operator with no tuple variable refence and at least one true condition, should return all tuples', function(assert) {
+		QUnit.test('given ∃ operator with no tuple variable refence and at least one true condition, should return all tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 300) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult()
@@ -199,7 +199,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('given ∃ operator with no tuple variable reference and false condition, should return no tuples', function(assert) {
+		QUnit.test('given ∃ operator with no tuple variable reference and false condition, should return no tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 1000) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult();
@@ -207,7 +207,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.equal(resultTrc.getNumRows(), 0);
 		});
 
-		QUnit.test('given ∃ operator with tuple variable reference and false condition, should perform a join', function(assert) {
+		QUnit.test('given ∃ operator with tuple variable reference and false condition, should perform a join', (assert) => {
 			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.b = t.b) }';
 			const queryRa = 'pi R.a, R.b, R.c (R join b = b S)'
 
@@ -219,7 +219,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	});
 
 	QUnit.module('universal operator(∀)', () => {
-		QUnit.test('given ∀ operator with no tuple variable reference and false condition, should return no tuples', function(assert) {
+		QUnit.test('given ∀ operator with no tuple variable reference and false condition, should return no tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult();
@@ -227,7 +227,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.equal(resultTrc.getNumRows(), 0);
 		});
 
-		QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return no tuples', function(assert) {
+		QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return no tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult();
@@ -235,7 +235,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.equal(resultTrc.getNumRows(), 0);
 		});
 
-		QUnit.test('given ∀ operator with tuple variable reference and true condition for all elements, should return all tuples', function(assert) {
+		QUnit.test('given ∀ operator with tuple variable reference and true condition for all elements, should return all tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 50) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult();
@@ -245,7 +245,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		});
 	});
 
-	QUnit.test('test simple relation', function(assert) {
+	QUnit.test('test simple relation', (assert) => {
 		const query = '{ t | R(t) }';
 		const root = exec_trc(query);
 
