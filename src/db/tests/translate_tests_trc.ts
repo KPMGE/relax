@@ -137,12 +137,22 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc, resultRa);
 		});
 
-		QUnit.test('given ∃ operator with no tuple variable reference end false condition, should return no tuples', function(assert) {
+		QUnit.test('given ∃ operator with no tuple variable reference and false condition, should return no tuples', function(assert) {
 			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 1000) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult();
 
 			assert.equal(resultTrc.getNumRows(), 0);
+		});
+
+		QUnit.test('given ∃ operator with tuple variable reference and false condition, should perform a join', function(assert) {
+			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.b = t.b) }';
+			const queryRa = 'pi R.a, R.b, R.c (R join b = b S)'
+
+			const resultTrc = exec_trc(queryTrc).getResult();
+			const resultRa = exec_ra(queryRa).getResult();
+
+			assert.deepEqual(resultTrc, resultRa);
 		});
 	});
 
