@@ -190,8 +190,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	})
 
 	QUnit.module('existencial operator(∃)', () => {
-		QUnit.test('given ∃ operator with no tuple variable refence and true condition, should return all tuples', function(assert) {
-			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 10) }';
+		QUnit.test('given ∃ operator with no tuple variable refence and at least one true condition, should return all tuples', function(assert) {
+			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 300) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = srcTableR.getResult();
