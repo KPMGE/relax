@@ -129,3 +129,20 @@ QUnit.test('test != predicate', function(assert) {
 
 	assert.deepEqual(resultTrc, resultRa);
 });
+
+QUnit.test('given existencial operator with no refence to the tuple variable and true condition, should return all tuples', function(assert) {
+	const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 10) }';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = srcTableR.getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
+});
+
+QUnit.test('given existencial operator with no refence to the tuple variable and false condition, should return no tuples', function(assert) {
+	const queryTrc = '{ t | R(t) and ∃s(S(s) and s.d > 1000) }';
+
+	const resultTrc = exec_trc(queryTrc).getResult();
+
+	assert.equal(resultTrc.getNumRows(), 0);
+});
