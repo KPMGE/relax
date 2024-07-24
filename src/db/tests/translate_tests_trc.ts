@@ -66,6 +66,68 @@ function exec_ra(query: string) {
 QUnit.module('translate trc ast to relational algebra', () => {
 
 	QUnit.module('predicates', () => {
+		QUnit.module('negation', () => {
+			QUnit.test('test > predicate negation', function(assert) {
+				const queryTrc = '{ t | R(t) and not t.a > 3 }';
+				const queryRa = 'sigma a <= 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('test < predicate negation', function(assert) {
+				const queryTrc = '{ t | R(t) and not t.a < 3 }';
+				const queryRa = 'sigma a >= 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('test = predicate negation', function(assert) {
+				const queryTrc = '{ t | R(t) and not t.a = 3 }';
+				const queryRa = 'sigma a != 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('test <= predicate negation', function(assert) {
+				const queryTrc = '{ t | R(t) and not t.a <= 3 }';
+				const queryRa = 'sigma a > 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('test >= predicate negation', function(assert) {
+				const queryTrc = '{ t | R(t) and not t.a >= 3 }';
+				const queryRa = 'sigma a < 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('test != predicate', function(assert) {
+				const queryTrc = '{ t | R(t) and not t.a != 3 }';
+				const queryRa = 'sigma a = 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+		})
+
 		QUnit.test('test > predicate', function(assert) {
 			const queryTrc = '{ t | R(t) and t.a > 3 }';
 			const queryRa = 'sigma a > 3 (R)';
