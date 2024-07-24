@@ -218,6 +218,33 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		});
 	});
 
+	QUnit.module('universal operator(∀)', () => {
+		QUnit.test('given ∀ operator with no tuple variable reference and false condition, should return no tuples', function(assert) {
+			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
+
+			const resultTrc = exec_trc(queryTrc).getResult();
+
+			assert.equal(resultTrc.getNumRows(), 0);
+		});
+
+		QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return no tuples', function(assert) {
+			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
+
+			const resultTrc = exec_trc(queryTrc).getResult();
+
+			assert.equal(resultTrc.getNumRows(), 0);
+		});
+
+		QUnit.test('given ∀ operator with tuple variable reference and true condition for all elements, should return all tuples', function(assert) {
+			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 50) }';
+
+			const resultTrc = exec_trc(queryTrc).getResult();
+			const resultRa = srcTableR.getResult();
+
+			assert.deepEqual(resultTrc, resultRa);
+		});
+	});
+
 	QUnit.test('test simple relation', function(assert) {
 		const query = '{ t | R(t) }';
 		const root = exec_trc(query);
