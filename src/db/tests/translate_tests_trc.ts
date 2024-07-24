@@ -53,7 +53,6 @@ const relations: {
 function exec_trc(query: string): RANode {
 	const ast = relalgjs.parseTRCSelect(query);
 
-	// relalgjs.replaceVariables(ast, relations);
 	const root = relalgjs.relalgFromTRCAstRoot(ast, relations);
 	root.check();
 
@@ -64,9 +63,69 @@ function exec_ra(query: string) {
 	return relalgjs.executeRelalg(query, relations);
 }
 
-QUnit.test('.test relation', function (assert) {
+QUnit.test('test simple relation', function(assert) {
 	const query = '{ t | R(t) }';
 	const root = exec_trc(query);
 
 	assert.deepEqual(root.getResult(), srcTableR.getResult());
+});
+
+QUnit.test('test > predicate', function(assert) {
+	const queryTrc = '{ t | R(t) and t.a > 3 }';
+	const queryRa = 'sigma a > 3 (R)';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = exec_ra(queryRa).getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
+});
+
+QUnit.test('test < predicate', function(assert) {
+	const queryTrc = '{ t | R(t) and t.a < 3 }';
+	const queryRa = 'sigma a < 3 (R)';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = exec_ra(queryRa).getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
+});
+
+QUnit.test('test = predicate', function(assert) {
+	const queryTrc = '{ t | R(t) and t.a = 3 }';
+	const queryRa = 'sigma a = 3 (R)';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = exec_ra(queryRa).getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
+});
+
+QUnit.test('test <= predicate', function(assert) {
+	const queryTrc = '{ t | R(t) and t.a <= 3 }';
+	const queryRa = 'sigma a <= 3 (R)';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = exec_ra(queryRa).getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
+});
+
+QUnit.test('test >= predicate', function(assert) {
+	const queryTrc = '{ t | R(t) and t.a >= 3 }';
+	const queryRa = 'sigma a >= 3 (R)';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = exec_ra(queryRa).getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
+});
+
+QUnit.test('test != predicate', function(assert) {
+	const queryTrc = '{ t | R(t) and t.a != 3 }';
+	const queryRa = 'sigma a != 3 (R)';
+
+	const resultTrc = exec_trc(queryTrc).getResult()
+	const resultRa = exec_ra(queryRa).getResult();
+
+	assert.deepEqual(resultTrc, resultRa);
 });
