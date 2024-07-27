@@ -64,6 +64,22 @@ function exec_ra(query: string) {
 
 
 QUnit.module('translate trc ast to relational algebra', () => {
+	QUnit.test('test simple relation', (assert) => {
+		const query = '{ t | R(t) }';
+		const root = exec_trc(query);
+
+		assert.deepEqual(root.getResult(), srcTableR.getResult());
+	});
+
+	QUnit.test('test projection', (assert) => {
+		const queryTrc = '{ t.a, t.b | R(t) }';
+		const queryRa = 'pi a, b (R)'
+
+		const resultTrc = exec_trc(queryTrc).getResult();
+		const resultRa = exec_ra(queryRa).getResult();
+
+		assert.deepEqual(resultTrc, resultRa);
+	});
 
 	QUnit.module('predicates', () => {
 		QUnit.module('negation', () => {
@@ -207,7 +223,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.equal(resultTrc.getNumRows(), 0);
 		});
 
-		QUnit.test('given ∃ operator with tuple variable reference and false condition, should perform a join', (assert) => {
+		QUnit.test('given ∃ operator with tuple variable reference and false condition, should return tuples that match the condition', (assert) => {
 			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.b = t.b) }';
 			const queryRa = 'pi R.a, R.b, R.c (R join b = b S)'
 
@@ -215,6 +231,34 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultRa = exec_ra(queryRa).getResult();
 
 			assert.deepEqual(resultTrc, resultRa);
+		});
+
+		QUnit.module('Negation', () => {
+			QUnit.test('given ¬∃ with no tuple variable refence and at least one exists true condition, should return no tuples', (assert) => {
+				const queryTrc = '{ t | R(t) and not ∃s(S(s) and s.d > 300) }';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+
+				assert.equal(resultTrc.getNumRows(), 0);
+			});
+
+			QUnit.test('given ¬∃ with no tuple variable reference and exists false condition, should return all tuples', (assert) => {
+				const queryTrc = '{ t | R(t) and not ∃s(S(s) and s.d > 1000) }';
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+
+				assert.deepEqual(resultTrc, srcTableR.getResult());
+			});
+
+			QUnit.test('given ¬∃ with tuple variable reference and, return tuples that do not match the condition', (assert) => {
+				const queryTrc = '{ t | R(t) and not ∃s(S(s) and (s.d < 100 and t.a < 3)) }';
+				const queryRa = 'R ⋉ (R join S.d >= 100 and R.a >= 3 S)'
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
 		});
 	});
 
@@ -235,7 +279,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.equal(resultTrc.getNumRows(), 0);
 		});
 
-		QUnit.test('given ∀ operator with tuple variable reference and true condition for all elements, should return all tuples', (assert) => {
+		QUnit.test('given ∀ operator with no tuple variable reference and true condition for all elements, should return all tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 50) }';
 
 			const resultTrc = exec_trc(queryTrc).getResult();
@@ -243,22 +287,5 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 			assert.deepEqual(resultTrc, resultRa);
 		});
-	});
-
-	QUnit.test('test simple relation', (assert) => {
-		const query = '{ t | R(t) }';
-		const root = exec_trc(query);
-
-		assert.deepEqual(root.getResult(), srcTableR.getResult());
-	});
-
-	QUnit.test('test projection', (assert) => {
-		const queryTrc = '{ t.a, t.b | R(t) }';
-		const queryRa = 'pi a, b (R)'
-
-		const resultTrc = exec_trc(queryTrc).getResult();
-		const resultRa = exec_ra(queryRa).getResult();
-
-		assert.deepEqual(resultTrc, resultRa);
 	});
 });

@@ -185,7 +185,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'QuantifiedExpression': {
-				const resultFormula = rec(nRaw.formula, nRaw.variable, negated)
+				const resultFormula = rec(nRaw.formula, nRaw.variable, false)
 
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
@@ -193,7 +193,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					// expression, that means we are actully performing a join
 					const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
 					if (uses) {
-						return resultFormula
+						return rec(nRaw.formula, nRaw.variable, negated)
 					}
 
 					const aggregate = [
