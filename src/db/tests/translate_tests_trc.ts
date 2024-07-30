@@ -14,11 +14,12 @@ import * as relalgjs from '../relalg';
 const srcTableR: Relation = relalgjs.executeRelalg(`{
 	R.a, R.b, R.c
 
-	1,   a,   d
-	3,   c,   c
-	4,   d,   f
-	5,   d,   b
-	6,   e,   f
+	1,    a,   d
+	3,    c,   c
+	4,    d,   f
+	5,    d,   b
+	6,    e,   f
+	1000, k,  k
 }`, {}) as Relation;
 const srcTableS: Relation = relalgjs.executeRelalg(`{
 	S.b, S.d
@@ -263,14 +264,6 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	});
 
 	QUnit.module('universal operator(∀)', () => {
-		QUnit.test('given ∀ operator with no tuple variable reference and false condition, should return no tuples', (assert) => {
-			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
-
-			const resultTrc = exec_trc(queryTrc).getResult();
-
-			assert.equal(resultTrc.getNumRows(), 0);
-		});
-
 		QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return no tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
 
@@ -286,6 +279,20 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultRa = srcTableR.getResult();
 
 			assert.deepEqual(resultTrc, resultRa);
+		});
+
+		QUnit.test('given ∀ operator with tuple variable reference should return tuples that match the condition', (assert) => {
+			const queryTrc1 = '{ r | R(r) and ∀s(S(s) → s.d < r.a) }';
+			const queryTrc2 = '{ r | R(r) and ∀s(S(s) → s.d > r.a) }';
+
+			const expectedResult1 = exec_ra('sigma a = 1000 (R)').getResult()
+			const expectedResult2 = exec_ra('sigma a < 1000 (R)').getResult()
+
+			const resultTrc1 = exec_trc(queryTrc1).getResult();
+			const resultTrc2 = exec_trc(queryTrc2).getResult();
+
+			assert.deepEqual(resultTrc1, expectedResult1);
+			assert.deepEqual(resultTrc2, expectedResult2);
 		});
 	});
 });

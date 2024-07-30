@@ -185,7 +185,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'QuantifiedExpression': {
-				const resultFormula = rec(nRaw.formula, nRaw.variable, false)
+				const resultFormula = rec(nRaw.formula, nRaw.variable, negated)
 
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
@@ -224,15 +224,13 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					return new Selection(new CrossJoin(tupleVariableRelation, count), recValueExpr(convertPredicate(condition)))
 				} else {
 					// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
-					const negatedFormula = {
-						type: 'Negation',
-						formula: nRaw.formula
-					}
 					const notExists = {
 						type: 'Negation',
-						formula: { ...nRaw, quantifier: 'exists', formula: negatedFormula }
+						formula: { ...nRaw, quantifier: 'exists'}
 					}
-					return rec(notExists, tupleVariable, negated)
+
+					const shouldBeNegated = !usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+					return rec(notExists, tupleVariable, shouldBeNegated)
 				}
 			}
 
@@ -260,7 +258,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					case 'QuantifiedExpression': {
 						// NOTE: the negated quantified expression will always be 'exists',
 						// becase the universal quantifier is tranformed into an existencial one
-						return rec(nRaw.formula, tupleVariable, true)
+						return rec(nRaw.formula, tupleVariable, negated)
 					}
 
 					case 'LogicalExpression': {
@@ -337,12 +335,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Predicate': {
-				console.log('PREDICATE: ', { negated, tupleVariable, test: nRaw.right.variable })
 				const leftRelationName = references.get(nRaw.left.variable)
 				if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.left.variable}`)
 				const leftRelation = relations[leftRelationName].copy()
 
-				if (negated && nRaw.right.type !== 'AttributeReference') {
+				if (negated) {
 					nRaw.operator = notOperator(nRaw.operator)
 				}
 
