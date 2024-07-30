@@ -107,8 +107,7 @@ AttributeReference
       return { type: 'AttributeReference', variable, attribute };
     }
 
-RelOp
-  = '=' / '!=' / '<=' / '>=' / '<' / '>'
+RelOp = ('=' / '!=' / '<=' / '>=' / '<' / '>')
 
 LogicOp = ('or' / '∨' / 'and' / '∧' / 'implies' / '→')
 
