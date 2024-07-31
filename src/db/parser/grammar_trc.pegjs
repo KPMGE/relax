@@ -73,16 +73,47 @@ LogicalExpression
 
 AtomicFormula = RelationPredicate / Predicate
 
+
+
 BaseFormula 
 	=	AtomicFormula 
 	/
 	'not' _ formula:BaseFormula {
+			const map = {
+				'<': '>=',
+				'>': '<=',
+				'<=': '>',
+				'>=': '<',
+				'=': '!=',
+				'!=': '='
+			}
+
+			if (formula.type === 'QuantifiedExpression') {
+				console.log('NEGATION Q')
+				if (formula.formula.right.type === 'Predicate') {
+					console.log('NEGATION P: ', formula.formula.right)
+					formula.formula.right.operator = map[formula.formula.right.operator]
+				}
+			}
       return createNegation(formula);
     }
   / '(' _ formula:Formula _ ')' {
       return formula;
     }
   / ('exists' / '∃') _ variable:Variable _ '(' _ formula:Formula _ ')' {
+			const map = {
+				'<': '>=',
+				'>': '<=',
+				'<=': '>',
+				'>=': '<',
+				'=': '!=',
+				'!=': '='
+			}
+
+			if (formula.right.type === 'Predicate') {
+				formula.right.operator = map[formula.right.operator]
+			}
+
       return createQuantifiedExpression('exists', variable, formula);
     }
   / ('forAll' / '∀') _ variable:Variable _ '(' _ formula:Formula _ ')' {
