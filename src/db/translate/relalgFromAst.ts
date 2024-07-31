@@ -185,7 +185,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'QuantifiedExpression': {
-				const resultFormula = rec(nRaw.formula, nRaw.variable, negated)
+				const resultFormula = rec(nRaw.formula, nRaw.variable, !negated)
 
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
@@ -229,7 +229,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						formula: { ...nRaw, quantifier: 'exists'}
 					}
 
-					const shouldBeNegated = !usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+					const shouldBeNegated = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
 					return rec(notExists, tupleVariable, shouldBeNegated)
 				}
 			}
@@ -258,7 +258,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					case 'QuantifiedExpression': {
 						// NOTE: the negated quantified expression will always be 'exists',
 						// becase the universal quantifier is tranformed into an existencial one
-						return rec(nRaw.formula, tupleVariable, negated)
+						return rec(nRaw.formula, tupleVariable, true)
 					}
 
 					case 'LogicalExpression': {
