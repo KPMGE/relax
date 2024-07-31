@@ -19,7 +19,7 @@ const srcTableR: Relation = relalgjs.executeRelalg(`{
 	4,    d,   f
 	5,    d,   b
 	6,    e,   f
-	1000, k,  k
+	1000, e,   k
 }`, {}) as Relation;
 const srcTableS: Relation = relalgjs.executeRelalg(`{
 	S.b, S.d
@@ -224,9 +224,9 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.equal(resultTrc.getNumRows(), 0);
 		});
 
-		QUnit.test('given ∃ operator with tuple variable reference and false condition, should return tuples that match the condition', (assert) => {
+		QUnit.test('given ∃ operator with tuple variable reference and true condition, should return tuples that match the condition', (assert) => {
 			const queryTrc = '{ t | R(t) and ∃s(S(s) and s.b = t.b) }';
-			const queryRa = 'pi R.a, R.b, R.c (R join b = b S)'
+			const queryRa = 'pi R.a, R.b, R.c (R join R.b = S.b S)'
 
 			const resultTrc = exec_trc(queryTrc).getResult();
 			const resultRa = exec_ra(queryRa).getResult();
