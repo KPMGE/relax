@@ -141,6 +141,15 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				}
 				return false
 			}
+
+			case 'Negation': {
+				return usesVariableInPredicate(node.formula, variable)
+			}
+
+			case 'QuantifiedExpression': {
+				return usesVariableInPredicate(node.formula, variable)
+			}
+
 			default: return false
 		}
 	}
@@ -185,7 +194,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'QuantifiedExpression': {
-				const resultFormula = rec(nRaw.formula, nRaw.variable, !negated)
+				const resultFormula = rec(nRaw.formula, nRaw.variable, false)
 
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
@@ -224,12 +233,14 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					return new Selection(new CrossJoin(tupleVariableRelation, count), recValueExpr(convertPredicate(condition)))
 				} else {
 					// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
+					const notFormula = usesVariableInPredicate(nRaw, tupleVariable as string) ?  nRaw.formula : { type: 'Negation', formula: nRaw.formula }
 					const notExists = {
-						type: 'Negation',
-						formula: { ...nRaw, quantifier: 'exists'}
+						 ...nRaw,
+						quantifier: 'exists',
+						formula: notFormula
 					}
 
-					const shouldBeNegated = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+					const shouldBeNegated = !usesVariableInPredicate(nRaw.formula, tupleVariable as string)
 					return rec(notExists, tupleVariable, shouldBeNegated)
 				}
 			}
@@ -284,7 +295,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 								// NOTE: we can't negate a RelationPredicate
 								if (nRaw.formula.left.type === 'RelationPredicate') {
-									return rec(notRight, tupleVariable, true)
+									return rec(nRaw.formula.right, tupleVariable, true)
 								}
 
 								return rec(or, tupleVariable, true)
@@ -340,7 +351,8 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				const leftRelation = relations[leftRelationName].copy()
 
 				if (negated) {
-					nRaw.operator = notOperator(nRaw.operator)
+					const notOp = notOperator(nRaw.operator)
+					nRaw = { ...nRaw, operator:  notOp }
 				}
 
 				// NOTE: that means we're dealing with a join
