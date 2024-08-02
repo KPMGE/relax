@@ -82,9 +82,9 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		assert.deepEqual(resultTrc, resultRa);
 	});
 
-	QUnit.module('predicates', () => {
-		QUnit.module('negation', () => {
-			QUnit.test('test > predicate negation', (assert) => {
+	QUnit.module('Predicates', () => {
+		QUnit.module('Negation', () => {
+			QUnit.test('> predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a > 3 }';
 				const queryRa = 'sigma a <= 3 (R)';
 
@@ -94,7 +94,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test < predicate negation', (assert) => {
+			QUnit.test('< predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a < 3 }';
 				const queryRa = 'sigma a >= 3 (R)';
 
@@ -104,7 +104,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test = predicate negation', (assert) => {
+				QUnit.test('= predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a = 3 }';
 				const queryRa = 'sigma a != 3 (R)';
 
@@ -114,7 +114,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test <= predicate negation', (assert) => {
+			QUnit.test('<= predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a <= 3 }';
 				const queryRa = 'sigma a > 3 (R)';
 
@@ -124,7 +124,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-			QUnit.test('test >= predicate negation', (assert) => {
+			QUnit.test('>= predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a >= 3 }';
 				const queryRa = 'sigma a < 3 (R)';
 
