@@ -240,7 +240,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						formula: notFormula
 					}
 
-					const shouldBeNegated = !usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+					const shouldBeNegated =  negated ? false : !usesVariableInPredicate(nRaw.formula, tupleVariable as string)
 					return rec(notExists, tupleVariable, shouldBeNegated)
 				}
 			}

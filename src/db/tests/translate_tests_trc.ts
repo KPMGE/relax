@@ -83,6 +83,23 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	});
 
 	QUnit.module('Predicates', () => {
+		QUnit.module('Conjunction', () => {
+			QUnit.test('given predicate with conjunction, when all the conditions meet, should return tuples', (assert) => {
+				const queryTrc = '{ t | R(t) and (t.a < 5 and t.a > 3) }';
+				const queryRa = 'sigma a < 5 and a > 3 3 (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+		});
+
+
+		QUnit.module('Disjunction', () => {
+		});
+
+
 		QUnit.module('Negation', () => {
 			QUnit.test('> predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a > 3 }';
@@ -104,7 +121,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				assert.deepEqual(resultTrc, resultRa);
 			});
 
-				QUnit.test('= predicate', (assert) => {
+			QUnit.test('= predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not t.a = 3 }';
 				const queryRa = 'sigma a != 3 (R)';
 
@@ -293,6 +310,26 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 			assert.deepEqual(resultTrc1, expectedResult1);
 			assert.deepEqual(resultTrc2, expectedResult2);
+		});
+
+
+		QUnit.module('Negation', () => {
+			QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return all tuples', (assert) => {
+				const queryTrc = '{ t | R(t) and not ∀s(S(s) and s.d > 300) }';
+
+				const resultRa = srcTableR.getResult();
+				const resultTrc = exec_trc(queryTrc).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('given ∀ operator with no tuple variable reference and true condition for all elements, should return no tuples', (assert) => {
+				const queryTrc = '{ t | R(t) and not ∀s(S(s) and s.d > 50) }';
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+
+				assert.equal(resultTrc.getNumRows(), 0);
+			});
 		});
 	});
 });
