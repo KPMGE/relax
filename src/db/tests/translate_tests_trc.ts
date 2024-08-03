@@ -330,6 +330,20 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 				assert.equal(resultTrc.getNumRows(), 0);
 			});
+
+			QUnit.test('given ∀ operator with tuple variable reference should return tuples that do not match the condition', (assert) => {
+				const queryTrc1 = '{ r | R(r) and not ∀s(S(s) → s.d < r.a) }';
+				const queryTrc2 = '{ r | R(r) and not ∀s(S(s) → s.d > r.a) }';
+
+				const expectedResult1 = exec_ra('sigma a != 1000 (R)').getResult()
+				const expectedResult2 = exec_ra('sigma a >= 1000 (R)').getResult()
+
+				const resultTrc1 = exec_trc(queryTrc1).getResult();
+				const resultTrc2 = exec_trc(queryTrc2).getResult();
+
+				assert.deepEqual(resultTrc1, expectedResult1);
+				assert.deepEqual(resultTrc2, expectedResult2);
+			});
 		});
 	});
 });
