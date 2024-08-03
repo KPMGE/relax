@@ -93,6 +93,19 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 			assert.deepEqual(resultTrc, resultRa);
 		});
+
+		QUnit.module('Negation', () => {
+			QUnit.test('given logical implication, it should not return tuples that match the condition', (assert) => {
+				const queryTrc = "{ r | R(r) and not (r.a > 5 → r.b = 'a') }";
+				// NOTE: ¬(A → B) ≡ A ∧ ¬B
+				const queryRa = "sigma (a > 5 and b != 'a') (R)";
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+		});
 	});
 
 	QUnit.module('Predicates', () => {

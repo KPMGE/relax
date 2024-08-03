@@ -333,7 +333,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 									return rec(notRight, tupleVariable, true)
 								}
 
-								return rec(and, tupleVariable, true)
+								return rec(and, tupleVariable, false)
 							}
 
 							default:
