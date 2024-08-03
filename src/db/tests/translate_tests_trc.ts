@@ -86,7 +86,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		QUnit.module('Conjunction', () => {
 			QUnit.test('given predicate with conjunction, when all the conditions meet, should return tuples', (assert) => {
 				const queryTrc = '{ t | R(t) and (t.a < 5 and t.a > 3) }';
-				const queryRa = 'sigma a < 5 and a > 3 3 (R)';
+				const queryRa = 'sigma a < 5 and a > 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
