@@ -117,6 +117,18 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 				assert.deepEqual(resultTrc, resultRa);
 			});
+
+			QUnit.module('Negation', () => {
+				QUnit.test('given predicate with disjunction, when at least one of the conditions meet, should not return tuples', (assert) => {
+					const queryTrc = '{ t | R(t) and not (t.a < 3 or t.a < 5) }';
+					const queryRa = 'sigma a >= 3 and a >= 5 (R)';
+
+					const resultTrc = exec_trc(queryTrc).getResult()
+					const resultRa = exec_ra(queryRa).getResult();
+
+					assert.deepEqual(resultTrc, resultRa);
+				});
+			});
 		});
 
 		QUnit.module('Negation', () => {
