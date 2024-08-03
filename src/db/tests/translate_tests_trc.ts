@@ -82,6 +82,19 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		assert.deepEqual(resultTrc, resultRa);
 	});
 
+	QUnit.module('Logical implication', () => {
+		QUnit.test('given logical implication, it should return tuples that match the condition', (assert) => {
+			const queryTrc = "{ r | R(r) and r.a > 5 → r.b = 'e' }";
+			// NOTE: p → q ≡ ¬p ∨ q
+			const queryRa = "sigma (a <= 5 or b = 'e') (R)";
+
+			const resultTrc = exec_trc(queryTrc).getResult()
+			const resultRa = exec_ra(queryRa).getResult();
+
+			assert.deepEqual(resultTrc, resultRa);
+		});
+	});
+
 	QUnit.module('Predicates', () => {
 		QUnit.module('Conjunction', () => {
 			QUnit.test('given predicate with conjunction, when all the conditions meet, should return tuples', (assert) => {
@@ -342,7 +355,6 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			assert.deepEqual(resultTrc1, expectedResult1);
 			assert.deepEqual(resultTrc2, expectedResult2);
 		});
-
 
 		QUnit.module('Negation', () => {
 			QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return all tuples', (assert) => {
