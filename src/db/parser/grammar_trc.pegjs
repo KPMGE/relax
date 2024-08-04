@@ -1,4 +1,3 @@
-
 {
   function createRelationPredicate(relation, variable) {
     return { type: 'RelationPredicate', relation, variable };
@@ -20,16 +19,22 @@
     return { type: 'Negation', formula };
   }
 
-	function translateOperator(op) {
+	function translateLogicalOperator(op) {
 		const operators = {
-			'or': 'or',
 			'∨': 'or',
-			'and': 'and',
 			'∧': 'and',
-			'implies': 'implies',
 			'→': 'implies',
 		}
-		return operators[op]
+		return operators[op] ? operators[op] : op
+	}
+
+	function translateRelationalOperator(op) {
+		const operators = {
+			'≠': '!=',
+			'≤': '<=',
+			'≥': '>='
+		}
+		return operators[op] ? operators[op] : op
 	}
 }
 
@@ -66,19 +71,17 @@ Formula = LogicalExpression
 LogicalExpression 
 	= left:BaseFormula right:(_ LogicOp _ BaseFormula)* {
       return right.reduce((result, element) => {
-			  const op = translateOperator(element[1])
+			  const op = translateLogicalOperator(element[1])
         return createLogicalExpression(result, op, element[3]);
       }, left);
     }
 
 AtomicFormula = RelationPredicate / Predicate
 
-
-
 BaseFormula 
 	=	AtomicFormula 
 	/
-	'not' _ formula:BaseFormula {
+	('not' / '¬') _ formula:BaseFormula {
       return createNegation(formula);
     }
   / '(' _ formula:Formula _ ')' {
@@ -98,10 +101,10 @@ RelationPredicate
 
 Predicate
   = left:AttributeReference _ operator:RelOp _ right:Value {
-      return createPredicate(left, operator, right);
+      return createPredicate(left, translateRelationalOperator(operator), right);
     }
   / left:AttributeReference _ operator:RelOp _ right:AttributeReference {
-      return createPredicate(left, operator, right);
+      return createPredicate(left, translateRelationalOperator(operator), right);
     }
 
 AttributeReference
@@ -109,7 +112,7 @@ AttributeReference
       return { type: 'AttributeReference', variable, attribute };
     }
 
-RelOp = ('=' / '!=' / '<=' / '>=' / '<' / '>')
+RelOp = ('=' / '!=' / '<=' / '>=' / '<' / '>' / '≠' / '≤' / '≥')
 
 LogicOp = ('or' / '∨' / 'and' / '∧' / 'implies' / '→')
 

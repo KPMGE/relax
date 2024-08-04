@@ -7,7 +7,7 @@ import { Result } from "./result";
 import { relalgFromTRCAstRoot, parseTRCSelect } from "db/relalg";
 
 const NUM_TREE_LABEL_COLORS = 6;
-const KEYWORDS_TRC = ['exists', 'forAll', '|', 'and', 'or', 'not', 'implies', '=', 'empty'];
+const KEYWORDS_TRC = ['exists', 'forAll', 'and', 'or', 'not', 'implies'];
 
 interface Props {
 	group: Group,
@@ -31,7 +31,6 @@ export class EditorTrc extends React.Component<Props> {
 		group.tables.forEach(table => {
 			relations[table.tableName] = table.relation;
 		});
-
 
 		return (
 			<EditorBase
@@ -120,6 +119,30 @@ export class EditorTrc extends React.Component<Props> {
 								tooltip: 'calc.editors.trc.toolbar.not',
 								onClick: item => this.replaceText(item, '¬'),
 							},
+							{
+								label: '=',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.equals',
+								tooltip: 'calc.editors.trc.toolbar.equals-content',
+							},
+							{
+								label: '≠',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.not-equals',
+								tooltip: 'calc.editors.trc.toolbar.not-equals-content',
+							},
+							{
+								label: '≥',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.greater-or-equals',
+								tooltip: 'calc.editors.trc.toolbar.greater-or-equals-content',
+							},
+							{
+								label: '≤',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.lesser-or-equals',
+								tooltip: 'calc.editors.trc.toolbar.lesser-or-equals-content',
+							},
 						],
 					},
 					{
@@ -136,7 +159,6 @@ export class EditorTrc extends React.Component<Props> {
 				]}
 			/>
 		);
-
 	}
 
 	private replaceText(item: Item, overwrite?: string) {
