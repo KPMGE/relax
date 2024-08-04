@@ -202,7 +202,27 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					// expression, that means we are actully performing a join
 					const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
 					if (uses) {
-						return rec(nRaw.formula, nRaw.variable, negated)
+						const right = rec(nRaw.formula, nRaw.variable, negated)
+						const predicate = nRaw.formula.right
+						const cond = negated &&
+							predicate && 
+							predicate?.right.type === 'AttributeReference' &&
+							predicate?.left.type === 'AttributeReference' &&
+							predicate?.operator === '='
+
+						if (cond) {
+							const tupleVariableRelationName = references.get(tupleVariable as string)
+							if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariableRelationName}`)
+							const tupleVariableRelation = relations[tupleVariableRelationName].copy()
+
+							return new AntiJoin(tupleVariableRelation, right, {
+								type: 'natural',
+								restrictToColumns: null,
+							})
+
+						}
+
+						return right
 					}
 
 					const aggregate = [
