@@ -38,7 +38,7 @@
 	}
 }
 
-start = expr: TRC_Expr {
+start = _ expr: TRC_Expr _ {
 	return expr
 }
 
@@ -150,4 +150,16 @@ Projection
     }
 
 _ "whitespace"
-  = [ \t\n\r]*
+  = (WhiteSpace / Comment)*
+
+WhiteSpace
+  = [ \t\n\r]
+
+Comment
+  = SingleLineComment / MultiLineComment
+
+SingleLineComment
+  = '--' (![\n\r] .)*
+
+MultiLineComment
+  = '/*' (!'*/' .)* '*/'
