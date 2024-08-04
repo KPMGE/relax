@@ -1,4 +1,5 @@
 import React from "react";
+import { t, T } from 'calc2/i18n';
 import { EditorBase, getHintsFromGroup } from "./editorBase";
 import { Item } from "./toolbar";
 import { Group } from 'calc2/store/groups';
@@ -68,7 +69,12 @@ export class EditorTrc extends React.Component<Props> {
 					};
 				}}
 				tab="trc"
-				linterFunction={() => [...KEYWORDS_TRC]}
+				linterFunction={(self: EditorBase, editor: CodeMirror.Editor, text: string) => {
+					// TODO: implement proper linter function, for now it just tries to
+					// parse the text and shows the error if it fails on the editor!
+					parseTRCSelect(text)
+					return []
+				}}
 				getHintsFunction={() => {
 					const hints: string[] = [
 						...KEYWORDS_TRC,
