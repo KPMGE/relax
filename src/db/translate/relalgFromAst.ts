@@ -128,8 +128,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 	function usesVariableInPredicate(node: any, variable: string): boolean {
 		switch (node.type) {
-			// if we encounter another quantified expression, we know we should stop
-			// looking for the variable, as we're now entering a whole new formula
 			case 'LogicalExpression': {
 				const left = usesVariableInPredicate(node.left, variable)
 				const right = usesVariableInPredicate(node.right, variable)
@@ -281,15 +279,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 					case 'Predicate': {
 						return rec(nRaw.formula, tupleVariable, true)
-						// const leftRelationName = references.get(nRaw.formula.left.variable)
-						// if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.formula.left.variable}`)
-						// const leftRelation = relations[leftRelationName].copy()
-						// return new Difference(leftRelation, rec(nRaw.formula, tupleVariable))
 					}
 
 					case 'QuantifiedExpression': {
 						// NOTE: the negated quantified expression will always be 'exists',
-						// becase the universal quantifier is tranformed into an existencial one
+						// because the universal quantifier is tranformed into an existencial one
 						return rec(nRaw.formula, tupleVariable, true)
 					}
 
