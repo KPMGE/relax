@@ -165,35 +165,87 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'LogicalExpression': {
+				const notLeftExpr = {
+					type: 'Negation',
+					formula: nRaw.left
+				}
+
+				const notRightExpr = {
+					type: 'Negation',
+					formula: nRaw.right
+				}
+
 				// NOTE: p → q ≡ ¬p ∨ q
 				if (nRaw.operator === 'implies') {
-					const notLeft = {
-						type: 'Negation',
-						formula: nRaw.left
+					// NOTE: ¬(p → q) ≡ p ∧ ¬q
+					if (negated) {
+						const and = {
+							type: 'LogicalExpression',
+							left: nRaw.left,
+							operator: 'and',
+							right: notRightExpr
+						}
+
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(notRightExpr, tupleVariable)
+						}
+
+						return rec(and, tupleVariable)
 					}
 
 					if (nRaw.left.type === 'RelationPredicate') {
-						return rec(nRaw.right, tupleVariable, negated) as RANode
+						return rec(nRaw.right, tupleVariable) as RANode
 					}
 
 					const right = rec(nRaw.right, tupleVariable) as RANode
-					const left = rec(notLeft, tupleVariable, negated) as RANode
+					const left = rec(notLeftExpr, tupleVariable) as RANode
 					return new Union(left, right)
 				}
-
-				const left = rec(nRaw.left, tupleVariable, negated) as RANode
-				const right = rec(nRaw.right, tupleVariable, negated) as RANode
 
 				if (nRaw.operator === 'or') {
+					// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
+					if (negated) {
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(notRightExpr, tupleVariable)
+						}
+
+						const notLeft = rec(notLeftExpr, tupleVariable) as RANode
+						const notRight = rec(notRightExpr, tupleVariable) as RANode
+						return new SemiJoin(notLeft, notRight, true)
+					}
+
+					const left = rec(nRaw.left, tupleVariable) as RANode
+					const right = rec(nRaw.right, tupleVariable) as RANode
 					return new Union(left, right)
 				}
 
-				return new SemiJoin(left, right, true)
+				if (nRaw.operator === 'and') { 
+					// NOTE: ¬(p ∧ q) ≡ ¬p ∨ ¬q
+					if (negated) {
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(notRightExpr, tupleVariable)
+						}
+
+						const notLeft = rec(notLeftExpr, tupleVariable) as RANode
+						const notRight = rec(notRightExpr, tupleVariable) as RANode
+
+						const isPredicateFormula = nRaw.left.type === 'Predicate' && nRaw.right.type === 'Predicate' && nRaw.left?.left.variable === nRaw.right?.left.variable
+						if (isPredicateFormula) {
+							return new Union(notLeft, notRight)
+						}
+
+						return notRight
+					}
+
+					const left = rec(nRaw.left, tupleVariable) as RANode
+					const right = rec(nRaw.right, tupleVariable) as RANode
+					return new SemiJoin(left, right, true)
+				}
+
+				throw new Error('Unreachable!')
 			}
 
 			case 'QuantifiedExpression': {
-				const resultFormula = rec(nRaw.formula, nRaw.variable, false)
-
 				// TODO: Omg this is looking disgusting, gotta refactor that
 				if (nRaw.quantifier === 'exists') {
 					// NOTE: if we use the tuple variable inside the quantified
@@ -201,11 +253,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
 					if (uses) {
 						const right = rec(nRaw.formula, nRaw.variable, negated)
-						const predicate = nRaw.formula.right
+
+						const predicate = nRaw.formula?.right
 						const cond = negated &&
 							predicate && 
-							predicate?.right.type === 'AttributeReference' &&
-							predicate?.left.type === 'AttributeReference' &&
+							predicate?.right?.type === 'AttributeReference' &&
+							predicate?.left?.type === 'AttributeReference' &&
 							predicate?.operator === '='
 
 						if (cond) {
@@ -213,11 +266,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariableRelationName}`)
 							const tupleVariableRelation = relations[tupleVariableRelationName].copy()
 
+							const right = rec(nRaw.formula, nRaw.variable, false)
 							return new AntiJoin(tupleVariableRelation, right, {
-								type: 'natural',
-								restrictToColumns: null,
+								type: 'theta',
+								joinExpression: recValueExpr(convertPredicate(predicate)),
 							})
-
 						}
 
 						return right
@@ -241,7 +294,8 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						operator: negated ? '=' : '>',
 						right: 0
 					}
-					// TODO: handle nested cases, not only the tuple variable
+
+					const resultFormula = rec(nRaw.formula, nRaw.variable, false)
 					// count = gamma count(*)->c(resultFormula)
 					const count = new GroupBy(resultFormula, [], aggregate as any)
 					const tupleVariableRelationName = references.get(tupleVariable as string)
@@ -288,71 +342,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					}
 
 					case 'LogicalExpression': {
-						const notLeft = {
-							type: 'Negation',
-							formula: nRaw.formula.left
-						}
-
-						const notRight = {
-							type: 'Negation',
-							formula: nRaw.formula.right
-						}
-
-						switch (nRaw.formula.operator) {
-							// ¬(A ∧ B) ≡ ¬A ∨ ¬B
-							case 'and': {
-								const or = {
-									type: 'LogicalExpression',
-									left: notLeft,
-									operator: 'or',
-									right: notRight
-								}
-
-								// NOTE: we can't negate a RelationPredicate
-								if (nRaw.formula.left.type === 'RelationPredicate') {
-									return rec(nRaw.formula.right, tupleVariable, true)
-								}
-
-								return rec(or, tupleVariable, true)
-							}
-
-							// ¬(A ∨ B) ≡ ¬A ∧ ¬B
-							case 'or': {
-								const and = {
-									type: 'LogicalExpression',
-									left: notLeft,
-									operator: 'and',
-									right: notRight
-								}
-
-								// NOTE: we can't negate a RelationPredicate
-								if (nRaw.formula.left.type === 'RelationPredicate') {
-									return rec(notRight, tupleVariable, true)
-								}
-
-								return rec(and, tupleVariable, true)
-							}
-
-							// ¬(A → B) ≡ A ∧ ¬B
-							case 'implies': {
-								const and = {
-									type: 'LogicalExpression',
-									left: nRaw.formula.left,
-									operator: 'and',
-									right: notRight
-								}
-
-								// NOTE: we can't negate a RelationPredicate
-								if (nRaw.formula.left.type === 'RelationPredicate') {
-									return rec(notRight, tupleVariable, true)
-								}
-
-								return rec(and, tupleVariable, false)
-							}
-
-							default:
-								throw new Error('Unreachable')
-						}
+						return rec(nRaw.formula, tupleVariable, true)
 					}
 
 					default:
