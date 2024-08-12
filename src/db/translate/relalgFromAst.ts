@@ -70,7 +70,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			codeInfo: null as any
 		}
 
-		// TODO: add datatype info on the predicate 'AtrributeReference' node
 		const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
 		const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
 		const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
@@ -114,18 +113,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		}
 	}
 
-	function notOperator(op: string): string {
-		const lookupTable: any = {
-			'=': '!=',
-			'!=': '=',
-			'<': '>=',
-			'>': '<=',
-			'<=': '>',
-			'>=': '<'
-		}
-		return lookupTable[op]
-	}
-
 	function usesVariableInPredicate(node: any, variable: string): boolean {
 		switch (node.type) {
 			case 'LogicalExpression': {
@@ -150,6 +137,18 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 			default: return false
 		}
+	}
+
+	function notOperator(op: string): string {
+		const lookupTable: any = {
+			'=': '!=',
+			'!=': '=',
+			'<': '>=',
+			'>': '<=',
+			'<=': '>',
+			'>=': '<'
+		}
+		return lookupTable[op]
 	}
 
 	const and = (left: any, right: any) => ({
@@ -352,31 +351,22 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Predicate': {
-				const leftRelationName = references.get(nRaw.left.variable)
-				if (!leftRelationName) throw new Error(`Could not find relation with name: ${nRaw.left.variable}`)
-				const leftRelation = relations[leftRelationName].copy()
-
 				if (negated) {
-					const notOp = notOperator(nRaw.operator)
-					nRaw = { ...nRaw, operator: notOp }
+					nRaw.operator = notOperator(nRaw.operator)
 				}
 
-				// NOTE: that means we're dealing with a join
-				if (nRaw.right.type === 'AttributeReference') {
-					const rightRelationName = references.get(nRaw.right.variable)
-					if (!rightRelationName) throw new Error(`Could not find relation with name: ${nRaw.right.variable}`)
-					const rightRelation = relations[rightRelationName].copy()
+				const leftRel = getRelationByReference(nRaw.left.variable)
 
-					const join = new InnerJoin(leftRelation, rightRelation, {
+				if (nRaw.right.type === 'AttributeReference') {
+					const rightRel = getRelationByReference(nRaw.right.variable)
+
+					return new InnerJoin(leftRel, rightRel, {
 						type: 'theta',
 						joinExpression: recValueExpr(convertPredicate(nRaw)),
 					})
-
-					return join
 				}
 
-				const selection = new Selection(leftRelation, recValueExpr(convertPredicate(nRaw)))
-				return selection
+				return new Selection(leftRel, recValueExpr(convertPredicate(nRaw)))
 			}
 		}
 	}
