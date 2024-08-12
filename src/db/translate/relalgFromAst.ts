@@ -159,6 +159,13 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		right
 	})
 
+	const or = (left: any, right: any) => ({
+		type: 'LogicalExpression',
+		left,
+		operator: 'or',
+		right
+	})
+
 	const not = (formula: any) => ({
 		type: 'Negation',
 		formula
@@ -200,12 +207,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 						// NOTE: p → q ≡ ¬p ∨ q
 						if (nRaw.left.type === 'RelationPredicate') {
-							return rec(nRaw.right, tupleVariable) as RANode
+							return rec(nRaw.right, tupleVariable)
 						}
 
-						const right = rec(nRaw.right, tupleVariable) as RANode
-						const left = rec(not(nRaw.left), tupleVariable) as RANode
-						return new Union(left, right)
+						return rec(or(not(nRaw.left), nRaw.right), tupleVariable)
 					}
 
 					case 'or': {
@@ -215,9 +220,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 								return rec(not(nRaw.right), tupleVariable)
 							}
 
-							const notLeft = rec(not(nRaw.left), tupleVariable) as RANode
-							const notRight = rec(not(nRaw.right), tupleVariable) as RANode
-							return new SemiJoin(notLeft, notRight, true)
+							return rec(and(not(nRaw.left), not((nRaw.right))), tupleVariable)
 						}
 
 						const left = rec(nRaw.left, tupleVariable) as RANode
@@ -232,18 +235,15 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 								return rec(not(nRaw.right), tupleVariable)
 							}
 
-							const notLeft = rec(not(nRaw.left), tupleVariable) as RANode
-							const notRight = rec(not(nRaw.right), tupleVariable) as RANode
-
 							const isPredicateFormula = nRaw.left.type === 'Predicate'
 								&& nRaw.right.type === 'Predicate'
 								&& nRaw.left?.left.variable === nRaw.right?.left.variable
 
 							if (isPredicateFormula) {
-								return new Union(notLeft, notRight)
+								return rec(or(not(nRaw.left), not((nRaw.right))), tupleVariable)
 							}
 
-							return notRight
+							return rec(not(nRaw.right), tupleVariable) as RANode
 						}
 
 						const left = rec(nRaw.left, tupleVariable) as RANode
