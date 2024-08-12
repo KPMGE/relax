@@ -164,6 +164,16 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		formula
 	})
 
+	const getRelationByReference = (refName: string | null): Relation => {
+		if (!refName) {
+			throw new Error('refName must not be null')
+		}
+
+		const tupleVariableRelationName = references.get(refName)
+		if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariableRelationName}`)
+		return relations[tupleVariableRelationName].copy()
+	}
+
 	function rec(nRaw: trcAst.TRC_Expr | any, tupleVariable: string | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
@@ -225,7 +235,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							const notLeft = rec(not(nRaw.left), tupleVariable) as RANode
 							const notRight = rec(not(nRaw.right), tupleVariable) as RANode
 
-							const isPredicateFormula = nRaw.left.type === 'Predicate' 
+							const isPredicateFormula = nRaw.left.type === 'Predicate'
 								&& nRaw.right.type === 'Predicate'
 								&& nRaw.left?.left.variable === nRaw.right?.left.variable
 
@@ -247,75 +257,73 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'QuantifiedExpression': {
-				// TODO: Omg this is looking disgusting, gotta refactor that
-				if (nRaw.quantifier === 'exists') {
-					// NOTE: if we use the tuple variable inside the quantified
-					// expression, that means we are actully performing a join
-					const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
-					if (uses) {
-						const right = rec(nRaw.formula, nRaw.variable, negated)
+				switch (nRaw.quantifier) {
+					case 'exists': {
+						const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+						if (uses) {
+							const right = rec(nRaw.formula, nRaw.variable, negated)
 
-						const predicate = nRaw.formula?.right
-						const cond = negated &&
-							predicate &&
-							predicate?.right?.type === 'AttributeReference' &&
-							predicate?.left?.type === 'AttributeReference' &&
-							predicate?.operator === '='
+							const predicate = nRaw.formula?.right
+							const isJoinOperation = negated &&
+								predicate &&
+								predicate?.right?.type === 'AttributeReference' &&
+								predicate?.left?.type === 'AttributeReference' &&
+								predicate?.operator === '='
 
-						if (cond) {
-							const tupleVariableRelationName = references.get(tupleVariable as string)
-							if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariableRelationName}`)
-							const tupleVariableRelation = relations[tupleVariableRelationName].copy()
+							if (isJoinOperation) {
+								const tupleVariableRelation = getRelationByReference(tupleVariable)
+								const right = rec(nRaw.formula, nRaw.variable, false)
 
-							const right = rec(nRaw.formula, nRaw.variable, false)
-							return new AntiJoin(tupleVariableRelation, right, {
-								type: 'theta',
-								joinExpression: recValueExpr(convertPredicate(predicate)),
-							})
+								return new AntiJoin(tupleVariableRelation, right, {
+									type: 'theta',
+									joinExpression: recValueExpr(convertPredicate(predicate)),
+								})
+							}
+
+							return right
 						}
 
-						return right
-					}
+						const aggregate = [
+							{
+								aggFunction: "COUNT_ALL",
+								col: null,
+								name: "count"
+							}
+						]
 
-					const aggregate = [
-						{
-							aggFunction: "COUNT_ALL",
-							col: null,
-							name: "count"
+						const condition: trcAst.Predicate = {
+							type: 'Predicate',
+							left: {
+								type: 'AttributeReference',
+								variable: null as any,
+								attribute: 'count'
+							},
+							operator: negated ? '=' : '>',
+							right: 0
 						}
-					]
 
-					const condition: trcAst.Predicate = {
-						type: 'Predicate',
-						left: {
-							type: 'AttributeReference',
-							variable: null as any,
-							attribute: 'count'
-						},
-						operator: negated ? '=' : '>',
-						right: 0
+						const resultFormula = rec(nRaw.formula, nRaw.variable, false)
+						const tupleVariableRelation = getRelationByReference(tupleVariable)
+						const count = new GroupBy(resultFormula, [], aggregate as any)
+						return new Selection(new CrossJoin(tupleVariableRelation, count), recValueExpr(convertPredicate(condition)))
 					}
 
-					const resultFormula = rec(nRaw.formula, nRaw.variable, false)
-					// count = gamma count(*)->c(resultFormula)
-					const count = new GroupBy(resultFormula, [], aggregate as any)
-					const tupleVariableRelationName = references.get(tupleVariable as string)
-					if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariableRelationName}`)
-					const tupleVariableRelation = relations[tupleVariableRelationName].copy()
-					// sigma c > 0 (tupleRel x count)
-					return new Selection(new CrossJoin(tupleVariableRelation, count), recValueExpr(convertPredicate(condition)))
-				} else {
-					// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
-					const notFormula = usesVariableInPredicate(nRaw, tupleVariable as string) ? nRaw.formula : { type: 'Negation', formula: nRaw.formula }
-					const notExists = {
-						...nRaw,
-						quantifier: 'exists',
-						formula: notFormula
+					case 'forAll': {
+						// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
+						const notFormula = usesVariableInPredicate(nRaw, tupleVariable as string) ? nRaw.formula : not(nRaw.formula)
+						const notExists = {
+							...nRaw,
+							quantifier: 'exists',
+							formula: notFormula
+						}
+
+						const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
+						const shouldBeNegated = negated ? uses : !uses
+						return rec(notExists, tupleVariable, shouldBeNegated)
+
 					}
 
-					const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
-					const shouldBeNegated = negated ? uses : !uses
-					return rec(notExists, tupleVariable, shouldBeNegated)
+					default: throw new Error('Unreachable!')
 				}
 			}
 
