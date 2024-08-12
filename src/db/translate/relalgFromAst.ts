@@ -324,24 +324,16 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Negation': {
-				// NOTE: it means we're negating a predicate, so we can use set difference
-				// NOTE: not(codition(R)) ≡ R - sigma condition(R) 
 				switch (nRaw.formula.type) {
 					case 'Negation': {
 						return rec(nRaw.formula, tupleVariable, false)
 					}
 
-					case 'Predicate': {
-						return rec(nRaw.formula, tupleVariable, true)
-					}
-
+					// NOTE: the negated quantified expression will always be 'exists',
+					// because the universal quantifier is tranformed into an existencial one
+					case 'LogicalExpression':
+					case 'Predicate':
 					case 'QuantifiedExpression': {
-						// NOTE: the negated quantified expression will always be 'exists',
-						// because the universal quantifier is tranformed into an existencial one
-						return rec(nRaw.formula, tupleVariable, true)
-					}
-
-					case 'LogicalExpression': {
 						return rec(nRaw.formula, tupleVariable, true)
 					}
 
