@@ -1,5 +1,4 @@
 /*** Copyright 2016 Johannes Kessler 2016 Johannes Kessler
-*
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -16,7 +15,7 @@ import { AntiJoin } from '../exec/joins/AntiJoin';
 import { CrossJoin } from '../exec/joins/CrossJoin';
 import { FullOuterJoin } from '../exec/joins/FullOuterJoin';
 import { InnerJoin } from '../exec/joins/InnerJoin';
-import { JoinCondition, Join } from '../exec/joins/Join';
+import { JoinCondition } from '../exec/joins/Join';
 import { LeftOuterJoin } from '../exec/joins/LeftOuterJoin';
 import { RightOuterJoin } from '../exec/joins/RightOuterJoin';
 import { SemiJoin } from '../exec/joins/SemiJoin';
@@ -57,7 +56,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	// NOTE: this is map from tuple variable names to relation names
 	let references = new Map<string, string>()
 
-	function convertPredicate(predicate: trcAst.Predicate): relalgAst.valueExpr {
+	function convertPredicate(predicate: trcAst.Predicate, negated: boolean = false): relalgAst.valueExpr {
 		const leftRelationName = references.get(predicate.left.variable) ?? null
 		const leftArg: relalgAst.valueExpr = {
 			type: 'valueExpr',
@@ -90,6 +89,16 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			codeInfo: null as any
 		}
 
+		if (negated) {
+			return {
+				type: 'valueExpr',
+				datatype: 'boolean',
+				func: 'not',
+				args: [expr],
+				codeInfo: null as any
+			}
+		}
+
 		return expr
 	}
 
@@ -100,16 +109,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			case 'Negation': { setupReferences(root.formula) } break
 			case 'QuantifiedExpression': { setupReferences(root.formula) } break
 			case 'LogicalExpression': { setupReferences(root.left); setupReferences(root.right) } break
-		}
-	}
-
-	function getFirstRelation(node: any): string | null {
-		switch (node.type) {
-			case 'TRC_Expr': return getFirstRelation(node.formula)
-			case 'RelationPredicate':
-				return node.relation
-			case 'LogicalExpression': return getFirstRelation(node.left)
-			default: return null
 		}
 	}
 
@@ -137,18 +136,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 			default: return false
 		}
-	}
-
-	function notOperator(op: string): string {
-		const lookupTable: any = {
-			'=': '!=',
-			'!=': '=',
-			'<': '>=',
-			'>': '<=',
-			'<=': '>',
-			'>=': '<'
-		}
-		return lookupTable[op]
 	}
 
 	const and = (left: any, right: any) => ({
@@ -180,146 +167,145 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return relations[tupleVariableRelationName].copy()
 	}
 
-	function rec(nRaw: trcAst.TRC_Expr | any, tupleVariable: string | null = null, negated: boolean = false): any {
+	let tupleVarRef: string | null = null
+
+	function rec(nRaw: trcAst.TRC_Expr | any, baseRel: RANode | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
-				if (nRaw.projections.length !== 0) {
-					const relationName = getFirstRelation(nRaw)
-					const projectedCols = nRaw.projections.map((c: string) => new Column(c, relationName))
-					return new Projection(rec(nRaw.formula, nRaw.variable), projectedCols)
+				tupleVarRef = nRaw.variable
+				const tupleRel = getRelationByReference(nRaw.variable)
+
+				if (!tupleRel) {
+					throw new Error("Could not get the tuple relation by its reference!")
 				}
 
-				return rec(nRaw.formula, nRaw.variable)
+				if (nRaw.projections.length > 0) {
+					const relationName = tupleRel.getName()
+					const projections = nRaw.projections.map((c: string) => new Column(c, relationName))
+					return new Projection(rec(nRaw.formula, tupleRel), projections)
+				}
+
+				return new SemiJoin(tupleRel, rec(nRaw.formula, tupleRel), true)
 			}
 
-			case 'LogicalExpression': {
-				switch (nRaw.operator) {
-					case 'implies': {
-						// NOTE: ¬(p → q) ≡ p ∧ ¬q
+			case 'QuantifiedExpression': {
+				switch (nRaw.quantifier) {
+					case 'exists': {
+						if (!baseRel) {
+							throw new Error('Base relation is null!')
+						}
+
+						const quantifiedRel = getRelationByReference(nRaw.variable)
+						const newBaseRel = new CrossJoin(quantifiedRel, baseRel)
+
 						if (negated) {
-							if (nRaw.left.type === 'RelationPredicate') {
-								return rec(not(nRaw.right), tupleVariable)
+							if (!usesVariableInPredicate(nRaw, tupleVarRef as string)) {
+								const right = rec(nRaw.formula, newBaseRel, negated)
+								newBaseRel.check()
+
+								const numRows = newBaseRel.getResult().getNumRows()
+
+								const aggregate = [
+									{
+										aggFunction: "COUNT_ALL",
+										col: null,
+										name: "count"
+									}
+								]
+
+								const condition: trcAst.Predicate = {
+									type: 'Predicate',
+									left: {
+										type: 'AttributeReference',
+										variable: null as any,
+										attribute: 'count'
+									},
+									operator: '=',
+									right: numRows
+								}
+
+								const count = new GroupBy(right, [], aggregate as any)
+								return new Selection(new CrossJoin(newBaseRel, count), recValueExpr(convertPredicate(condition)))
 							}
 
-							return rec(and(nRaw.left, not(nRaw.right)), tupleVariable)
+							return rec(nRaw.formula, newBaseRel, negated)
 						}
 
-						// NOTE: p → q ≡ ¬p ∨ q
-						if (nRaw.left.type === 'RelationPredicate') {
-							return rec(nRaw.right, tupleVariable)
-						}
-
-						return rec(or(not(nRaw.left), nRaw.right), tupleVariable)
+						const right = rec(nRaw.formula, newBaseRel, negated)
+						return right
 					}
 
-					case 'or': {
-						// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
-						if (negated) {
-							if (nRaw.left.type === 'RelationPredicate') {
-								return rec(not(nRaw.right), tupleVariable)
-							}
-
-							return rec(and(not(nRaw.left), not((nRaw.right))), tupleVariable)
+					case 'forAll': {
+						// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
+						const exists = {
+							...nRaw,
+							quantifier: 'exists',
+							formula: not(nRaw.formula)
 						}
 
-						const left = rec(nRaw.left, tupleVariable) as RANode
-						const right = rec(nRaw.right, tupleVariable) as RANode
-						return new Union(left, right)
-					}
-
-					case 'and': {
-						// NOTE: ¬(p ∧ q) ≡ ¬p ∨ ¬q
-						if (negated) {
-							if (nRaw.left.type === 'RelationPredicate') {
-								return rec(not(nRaw.right), tupleVariable)
-							}
-
-							const isPredicateFormula = nRaw.left.type === 'Predicate'
-								&& nRaw.right.type === 'Predicate'
-								&& nRaw.left?.left.variable === nRaw.right?.left.variable
-
-							if (isPredicateFormula) {
-								return rec(or(not(nRaw.left), not((nRaw.right))), tupleVariable)
-							}
-
-							return rec(not(nRaw.right), tupleVariable) as RANode
+						if (!baseRel) {
+							throw new Error("Base relation is null!")
 						}
 
-						const left = rec(nRaw.left, tupleVariable) as RANode
-						const right = rec(nRaw.right, tupleVariable) as RANode
-						return new SemiJoin(left, right, true)
-
+						return rec(not(exists), baseRel, negated)
 					}
 
 					default: throw new Error('Unreachable!')
 				}
 			}
 
-			case 'QuantifiedExpression': {
-				switch (nRaw.quantifier) {
-					case 'exists': {
-						const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
-						if (uses) {
-							const right = rec(nRaw.formula, nRaw.variable, negated)
-
-							const predicate = nRaw.formula?.right
-							const isJoinOperation = negated &&
-								predicate &&
-								predicate?.right?.type === 'AttributeReference' &&
-								predicate?.left?.type === 'AttributeReference' &&
-								predicate?.operator === '='
-
-							if (isJoinOperation) {
-								const tupleVariableRelation = getRelationByReference(tupleVariable)
-								const right = rec(nRaw.formula, nRaw.variable, false)
-
-								return new AntiJoin(tupleVariableRelation, right, {
-									type: 'theta',
-									joinExpression: recValueExpr(convertPredicate(predicate)),
-								})
-							}
-
-							return right
+			case 'LogicalExpression': {
+				switch (nRaw.operator) {
+					case 'implies': {
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(nRaw.right, baseRel, negated)
 						}
 
-						const aggregate = [
-							{
-								aggFunction: "COUNT_ALL",
-								col: null,
-								name: "count"
-							}
-						]
-
-						const condition: trcAst.Predicate = {
-							type: 'Predicate',
-							left: {
-								type: 'AttributeReference',
-								variable: null as any,
-								attribute: 'count'
-							},
-							operator: negated ? '=' : '>',
-							right: 0
+						// NOTE: ¬(p → q) ≡ p ∧ ¬q
+						if (negated) {
+							return rec(and(nRaw.left, not(nRaw.right)), baseRel)
 						}
 
-						const resultFormula = rec(nRaw.formula, nRaw.variable, false)
-						const tupleVariableRelation = getRelationByReference(tupleVariable)
-						const count = new GroupBy(resultFormula, [], aggregate as any)
-						return new Selection(new CrossJoin(tupleVariableRelation, count), recValueExpr(convertPredicate(condition)))
+						// NOTE: p → q ≡ ¬p ∨ q
+						return rec(or(not(nRaw.left), nRaw.right), baseRel)
 					}
 
-					case 'forAll': {
-						// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
-						const notFormula = usesVariableInPredicate(nRaw, tupleVariable as string) ? nRaw.formula : not(nRaw.formula)
-						const notExists = {
-							...nRaw,
-							quantifier: 'exists',
-							formula: notFormula
+					case 'or': {
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(nRaw.right, baseRel, negated)
 						}
 
-						const uses = usesVariableInPredicate(nRaw.formula, tupleVariable as string)
-						const shouldBeNegated = negated ? uses : !uses
-						return rec(notExists, tupleVariable, shouldBeNegated)
+						if (!baseRel) {
+							throw new Error('Base realtion is null')
+						}
 
+						// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
+						if (negated) {
+							return rec(and(not(nRaw.left), not((nRaw.right))), baseRel)
+						}
+
+						const left = rec(nRaw.left, baseRel) as RANode
+						const right = rec(nRaw.right, baseRel) as RANode
+						return new Union(left, right)
+					}
+
+					case 'and': {
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(nRaw.right, baseRel, negated)
+						}
+
+						if (!baseRel) {
+							throw new Error('Base realtion is null')
+						}
+
+						// NOTE: ¬(p ∧ q) ≡ ¬p ∨ ¬q
+						if (negated) {
+							return rec(or(not(nRaw.left), not((nRaw.right))), baseRel)
+						}
+
+						const left = rec(nRaw.left, baseRel) as RANode
+						const right = rec(nRaw.right, baseRel) as RANode
+						return new Intersect(left, right)
 					}
 
 					default: throw new Error('Unreachable!')
@@ -332,41 +318,32 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Negation': {
-				switch (nRaw.formula.type) {
-					case 'Negation': {
-						return rec(nRaw.formula, tupleVariable, false)
-					}
-
-					// NOTE: the negated quantified expression will always be 'exists',
-					// because the universal quantifier is tranformed into an existencial one
-					case 'LogicalExpression':
-					case 'Predicate':
-					case 'QuantifiedExpression': {
-						return rec(nRaw.formula, tupleVariable, true)
-					}
-
-					default:
-						throw new Error('Negation is only allowed for predicates, logical expressions or quantified expressions!')
-				}
+				return rec(nRaw.formula, baseRel, !negated)
 			}
 
 			case 'Predicate': {
+				if (!baseRel) {
+					throw new Error('Base relation is null!')
+				}
+
+				if (nRaw.operator === '!=') {
+					nRaw.operator = '='
+					return rec(not(nRaw), baseRel, negated)
+				}
+
 				if (negated) {
-					nRaw.operator = notOperator(nRaw.operator)
+					// nRaw.operator = nRaw.operator === '!=' ? '=' : nRaw.operator
+
+					const tupleRel = getRelationByReference(tupleVarRef as string)
+
+					const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw)))
+					const t1 = new SemiJoin(tupleRel, sel, true)
+					const j2 = new SemiJoin(baseRel, t1, true)
+					return new Difference(baseRel, j2)
 				}
 
-				const leftRel = getRelationByReference(nRaw.left.variable)
-
-				if (nRaw.right.type === 'AttributeReference') {
-					const rightRel = getRelationByReference(nRaw.right.variable)
-
-					return new InnerJoin(leftRel, rightRel, {
-						type: 'theta',
-						joinExpression: recValueExpr(convertPredicate(nRaw)),
-					})
-				}
-
-				return new Selection(leftRel, recValueExpr(convertPredicate(nRaw)))
+				const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw, negated)))
+				return new SemiJoin(baseRel, sel, true)
 			}
 		}
 	}

@@ -74,12 +74,12 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 	QUnit.test('test projection', (assert) => {
 		const queryTrc = '{ t.a, t.b | R(t) }';
-		const queryRa = 'pi a, b (R)'
+		const queryRa = 'pi a, b (R)';
 
 		const resultTrc = exec_trc(queryTrc).getResult();
 		const resultRa = exec_ra(queryRa).getResult();
 
-		assert.deepEqual(resultTrc, resultRa);
+		assert.deepEqual(resultRa, resultTrc);
 	});
 
 	QUnit.module('Logical implication', () => {
@@ -326,8 +326,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('given ¬∃ with tuple variable reference and, return tuples that do not match the condition', (assert) => {
-				const queryTrc = '{ t | R(t) and not ∃s(S(s) and (s.d < 100 and t.a < 3)) }';
-				const queryRa = 'R ⋉ (R join S.d >= 100 and R.a >= 3 S)'
+				const queryTrc = '{ t | R(t) and not ∃s(S(s) and (s.d < 200 and t.a < 3)) }';
+				const queryRa = 'sigma R.a >= 3 (R)'
 
 				const resultTrc = exec_trc(queryTrc).getResult();
 				const resultRa = exec_ra(queryRa).getResult();
