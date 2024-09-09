@@ -325,22 +325,8 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					return rec(not(nRaw), baseRel, negated)
 				}
 
-				if (negated) {
-					const tupleRel = getRelationByReference(tupleVarRef as string)
-
-					const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw)))
-					const t1 = new SemiJoin(tupleRel, sel, true)
-					const j2 = new SemiJoin(baseRel, t1, true)
-
-					if (nRaw?.left?.variable === tupleVarRef || nRaw?.right?.variable === tupleVarRef) {
-						return new Difference(baseRel, j2)
-					}
-
-					return new Difference(baseRel, sel)
-				}
-
-				const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw, negated)))
-				return new SemiJoin(baseRel, sel, true)
+				const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw, !negated)))
+				return new Difference(baseRel, sel)
 			}
 		}
 	}
