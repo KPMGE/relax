@@ -124,8 +124,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 					const queryTrc = '{ t | R(t) and not (t.a < 5 and t.a > 3) }';
 					const queryRa = 'sigma a >= 5 or a <= 3 (R)';
 
-					const resultTrc = exec_trc(queryTrc).getResult()
-					const resultRa = exec_ra(queryRa).getResult();
+					const resultTrc = exec_trc(queryTrc).getResult().getRows().sort()
+					const resultRa = exec_ra(queryRa).getResult().getRows().sort()
 
 					assert.deepEqual(resultTrc, resultRa);
 				});
