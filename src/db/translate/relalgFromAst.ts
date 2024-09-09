@@ -232,10 +232,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							formula: not(nRaw.formula)
 						}
 
-						if (!baseRel) {
-							throw new Error("Base relation is null!")
-						}
-
 						// NOTE: ¬∀xP(x) ≡ ∃x(¬P(x))
 						if (negated) {
 							return rec(exists, baseRel)
@@ -269,10 +265,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							return rec(nRaw.right, baseRel, negated)
 						}
 
-						if (!baseRel) {
-							throw new Error('Base realtion is null')
-						}
-
 						// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
 						if (negated) {
 							return rec(and(not(nRaw.left), not((nRaw.right))), baseRel)
@@ -286,10 +278,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					case 'and': {
 						if (nRaw.left.type === 'RelationPredicate') {
 							return rec(nRaw.right, baseRel, negated)
-						}
-
-						if (!baseRel) {
-							throw new Error('Base realtion is null')
 						}
 
 						// NOTE: ¬(p ∧ q) ≡ ¬p ∨ ¬q
