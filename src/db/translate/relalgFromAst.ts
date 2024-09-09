@@ -162,9 +162,9 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			throw new Error('refName must not be null')
 		}
 
-		const tupleVariableRelationName = references.get(refName)
-		if (!tupleVariableRelationName) throw new Error(`Could not find relation with name: ${tupleVariableRelationName}`)
-		return relations[tupleVariableRelationName].copy()
+		const relName = references.get(refName)
+		if (!relName) throw new Error(`Could not find relation with name: ${relName}`)
+		return relations[relName].copy()
 	}
 
 	let tupleVarRef: string | null = null
@@ -198,37 +198,26 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						const quantifiedRel = getRelationByReference(nRaw.variable)
 						const newBaseRel = new CrossJoin(quantifiedRel, baseRel)
 
-						if (negated) {
-							if (!usesVariableInPredicate(nRaw, tupleVarRef as string)) {
-								const right = rec(nRaw.formula, newBaseRel, negated)
-								newBaseRel.check()
+						if (!usesVariableInPredicate(nRaw, tupleVarRef as string)) {
+							const right: RANode = rec(nRaw.formula, newBaseRel)
+							right.check()
 
-								const numRows = newBaseRel.getResult().getNumRows()
+							const amountRows = right.getResult().getRows().length
+							const rightBase = new SemiJoin(baseRel, right, true)
+							const zeroRel = new Difference(baseRel, baseRel)
+							const zeroTuples = new Intersect(zeroRel, rightBase)
+							const allTuples = new Union(baseRel, rightBase)
 
-								const aggregate = [
-									{
-										aggFunction: "COUNT_ALL",
-										col: null,
-										name: "count"
-									}
-								]
-
-								const condition: trcAst.Predicate = {
-									type: 'Predicate',
-									left: {
-										type: 'AttributeReference',
-										variable: null as any,
-										attribute: 'count'
-									},
-									operator: '=',
-									right: numRows
-								}
-
-								const count = new GroupBy(right, [], aggregate as any)
-								return new Selection(new CrossJoin(newBaseRel, count), recValueExpr(convertPredicate(condition)))
+							if (amountRows > 0) {
+								return negated ? zeroTuples : allTuples
 							}
 
-							return rec(nRaw.formula, newBaseRel, negated)
+							return negated ? allTuples : zeroTuples
+						}
+
+						if (negated) {
+							const right = rec(nRaw.formula, newBaseRel, false)
+							return new Difference(baseRel, new SemiJoin(baseRel, right, true))
 						}
 
 						const right = rec(nRaw.formula, newBaseRel, negated)
@@ -247,7 +236,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							throw new Error("Base relation is null!")
 						}
 
-						return rec(not(exists), baseRel, negated)
+						// NOTE: ¬∀xP(x) ≡ ∃x(¬P(x))
+						if (negated) {
+							return rec(exists, baseRel)
+						}
+
+						return rec(not(exists), baseRel)
 					}
 
 					default: throw new Error('Unreachable!')
@@ -332,14 +326,17 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				}
 
 				if (negated) {
-					// nRaw.operator = nRaw.operator === '!=' ? '=' : nRaw.operator
-
 					const tupleRel = getRelationByReference(tupleVarRef as string)
 
 					const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw)))
 					const t1 = new SemiJoin(tupleRel, sel, true)
 					const j2 = new SemiJoin(baseRel, t1, true)
-					return new Difference(baseRel, j2)
+
+					if (nRaw?.left?.variable === tupleVarRef || nRaw?.right?.variable === tupleVarRef) {
+						return new Difference(baseRel, j2)
+					}
+
+					return new Difference(baseRel, sel)
 				}
 
 				const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw, negated)))

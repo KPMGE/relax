@@ -52,7 +52,6 @@ const relations: {
 
 function exec_trc(query: string): RANode {
 	const ast = relalgjs.parseTRCSelect(query);
-
 	const root = relalgjs.relalgFromTRCAstRoot(ast, relations);
 	root.check();
 
