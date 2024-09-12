@@ -56,47 +56,39 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	// NOTE: this is map from tuple variable names to relation names
 	let references = new Map<string, string>()
 
-	function convertPredicate(predicate: trcAst.Predicate, negated: boolean = false): relalgAst.valueExpr {
-		const leftRelationName = references.get(predicate.left.variable) ?? null
-		const leftArg: relalgAst.valueExpr = {
+	// TODO: add right types
+	function makeValueExpr(datatype: any, func: any, args: any): relalgAst.valueExpr {
+		return {
 			type: 'valueExpr',
-			datatype: 'null',
-			func: 'columnValue',
-			args: [
-				predicate.left.attribute,
-				leftRelationName
-			],
+			datatype,
+			func,
+			args,
 			codeInfo: null as any
 		}
+	}
+
+	// TODO: add right types
+	function makeBooleanExpr(func: any, args: any) {
+		return makeValueExpr('boolean', func, args)
+	}
+
+	function convertPredicate(predicate: trcAst.Predicate, negated: boolean = false): relalgAst.valueExpr {
+		const leftRelationName = references.get(predicate.left.variable) ?? null
+		const leftArg = makeValueExpr('null', 'columnValue', [
+				predicate.left.attribute,
+				leftRelationName
+		])
 
 		const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
 		const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
 		const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
 		const rightRelationName = (typeof predicate.right == 'object') ? references.get(predicate.right.variable) : null
-		const rightArg: relalgAst.valueExpr = {
-			type: 'valueExpr',
-			datatype,
-			func,
-			args: [arg, rightRelationName],
-			codeInfo: null as any
-		}
 
-		const expr: relalgAst.valueExpr = {
-			type: 'valueExpr',
-			datatype: 'boolean',
-			func: predicate.operator,
-			args: [leftArg, rightArg],
-			codeInfo: null as any
-		}
+		const rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
+		const expr = makeBooleanExpr(predicate.operator, [leftArg, rightArg])
 
 		if (negated) {
-			return {
-				type: 'valueExpr',
-				datatype: 'boolean',
-				func: 'not',
-				args: [expr],
-				codeInfo: null as any
-			}
+			return makeBooleanExpr('not', [expr])
 		}
 
 		return expr
@@ -177,7 +169,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					}
 
 					case 'forAll': {
-						// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
 						const exists = {
 							...nRaw,
 							quantifier: 'exists',
@@ -189,6 +180,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							return rec(exists, baseRel)
 						}
 
+						// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
 						return rec(not(exists), baseRel)
 					}
 
