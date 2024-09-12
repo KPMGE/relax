@@ -112,32 +112,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		}
 	}
 
-	function usesVariableInPredicate(node: any, variable: string): boolean {
-		switch (node.type) {
-			case 'LogicalExpression': {
-				const left = usesVariableInPredicate(node.left, variable)
-				const right = usesVariableInPredicate(node.right, variable)
-				return left || right
-			}
-			case 'Predicate': {
-				if (node.left?.variable === variable || node.right?.variable === variable) {
-					return true
-				}
-				return false
-			}
-
-			case 'Negation': {
-				return usesVariableInPredicate(node.formula, variable)
-			}
-
-			case 'QuantifiedExpression': {
-				return usesVariableInPredicate(node.formula, variable)
-			}
-
-			default: return false
-		}
-	}
-
 	const and = (left: any, right: any) => ({
 		type: 'LogicalExpression',
 		left,
@@ -167,12 +141,9 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return relations[relName].copy()
 	}
 
-	let tupleVarRef: string | null = null
-
 	function rec(nRaw: trcAst.TRC_Expr | any, baseRel: RANode | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
-				tupleVarRef = nRaw.variable
 				const tupleRel = getRelationByReference(nRaw.variable)
 
 				if (!tupleRel) {
@@ -180,8 +151,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				}
 
 				if (nRaw.projections.length > 0) {
-					const relationName = tupleRel.getName()
-					const projections = nRaw.projections.map((c: string) => new Column(c, relationName))
+					const projections = nRaw.projections.map((c: string) => new Column(c, null))
 					return new Projection(rec(nRaw.formula, tupleRel), projections)
 				}
 
@@ -197,24 +167,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 						const quantifiedRel = getRelationByReference(nRaw.variable)
 						const newBaseRel = new CrossJoin(quantifiedRel, baseRel)
-
-						if (!usesVariableInPredicate(nRaw, tupleVarRef as string)) {
-							const right: RANode = rec(nRaw.formula, newBaseRel)
-							right.check()
-
-							const amountRows = right.getResult().getRows().length
-							const rightBase = new SemiJoin(baseRel, right, true)
-							const zeroRel = new Difference(baseRel, baseRel)
-							const zeroTuples = new Intersect(zeroRel, rightBase)
-							const allTuples = new Union(baseRel, rightBase)
-
-							if (amountRows > 0) {
-								return negated ? zeroTuples : allTuples
-							}
-
-							return negated ? allTuples : zeroTuples
-						}
-
 						if (negated) {
 							const right = rec(nRaw.formula, newBaseRel, false)
 							return new Difference(baseRel, new SemiJoin(baseRel, right, true))
@@ -306,28 +258,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				if (!baseRel) {
 					throw new Error('Base relation is null!')
 				}
-
-				if (nRaw.operator === '!=') {
-					nRaw.operator = '='
-					return rec(not(nRaw), baseRel, negated)
-				}
-
-				if (negated) {
-					const tupleRel = getRelationByReference(tupleVarRef as string)
-
-					const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw)))
-					const t1 = new SemiJoin(tupleRel, sel, true)
-					const j2 = new SemiJoin(baseRel, t1, true)
-
-					if (nRaw?.left?.variable === tupleVarRef || nRaw?.right?.variable === tupleVarRef) {
-						return new Difference(baseRel, j2)
-					}
-
-					return new Difference(baseRel, sel)
-				}
-
-			  const sel = new Selection(baseRel, recValueExpr(convertPredicate(nRaw, true)))
-				return new Difference(baseRel, sel)
+				return new Selection(baseRel, recValueExpr(convertPredicate(nRaw, negated)))
 			}
 		}
 	}
