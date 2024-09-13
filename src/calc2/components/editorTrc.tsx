@@ -6,6 +6,9 @@ import { Group } from 'calc2/store/groups';
 import { Relation } from 'db/exec/Relation';
 import { Result } from "./result";
 import { relalgFromTRCAstRoot, parseTRCSelect } from "db/relalg";
+import { faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { IconProp } from "@fortawesome/fontawesome-svg-core";
 
 const NUM_TREE_LABEL_COLORS = 6;
 const KEYWORDS_TRC = ['exists', 'forAll', 'and', 'or', 'not', 'implies'];
@@ -148,6 +151,12 @@ export class EditorTrc extends React.Component<Props> {
 								onClick: this.replaceText,
 								tooltipTitle: 'calc.editors.trc.toolbar.lesser-or-equals',
 								tooltip: 'calc.editors.trc.toolbar.lesser-or-equals-content',
+							},
+							{
+								label: <FontAwesomeIcon icon={faCalendarAlt  as IconProp} />,
+								onClick: item => this.replaceText(item, `date('1970-01-01')`),
+								tooltipTitle: 'calc.editors.ra.toolbar.insert-date',
+								tooltip: 'calc.editors.ra.toolbar.insert-date-content',
 							},
 						],
 					},

@@ -27,7 +27,7 @@ declare namespace trcAst {
 		type: 'Predicate',
 		left: AttributeReference,
 		operator: Operator,
-		right: AttributeReference | string | number
+		right: AttributeReference | string | number | Date
 	}
 
 	interface AttributeReference {

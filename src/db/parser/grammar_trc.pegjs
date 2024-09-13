@@ -127,7 +127,11 @@ Attribute
     }
 
 Value
-  = "'" chars:[^']* "\'" {
+  = 'date'i '(\'' d: DateIso '\')' {
+		return d;
+	}
+	/
+	"'" chars:[^']* "\'" {
       return chars.join('');
     }
   / digits:[0-9]+ {
@@ -163,3 +167,17 @@ SingleLineComment
 
 MultiLineComment
   = '/*' (!'*/' .)* '*/'
+
+DateIso 'date in ISO format (YYYY-MM-DD)'
+= year:$([0-9][0-9][0-9][0-9]) '-' month:$([0-9][0-9]) '-' day:$([0-9][0-9])
+	{
+		year = parseInt(year, 10);
+		month = parseInt(month, 10)-1;
+		day = parseInt(day, 10);
+		var date = new Date(year, month, day);
+
+		if(date.getFullYear() != year || date.getMonth() != month ||  date.getDate() != day){
+			error(t('db.messages.parser.error-invalid-date-format', {str: text()}));
+		}
+		return date;
+	}

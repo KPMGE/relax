@@ -75,18 +75,27 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	function convertPredicate(predicate: trcAst.Predicate, negated: boolean = false): relalgAst.valueExpr {
 		const leftRelationName = references.get(predicate.left.variable) ?? null
 		const leftArg = makeValueExpr('null', 'columnValue', [
-				predicate.left.attribute,
-				leftRelationName
+			predicate.left.attribute,
+			leftRelationName
 		])
 
-		const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
-		const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
-		const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
-		const rightRelationName = (typeof predicate.right == 'object') ? references.get(predicate.right.variable) : null
+		function isDate(value: any) {
+			return value instanceof Date;
+		}
 
-		const rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
+		let rightArg = null
+		if (isDate(predicate.right)) {
+			const dateStr = (predicate.right as Date).toISOString().split('T')[0]
+			rightArg = makeValueExpr('date', 'date', [makeValueExpr('string', 'constant', [dateStr])])
+		} else {
+			const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
+			const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
+			const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
+			const rightRelationName = (typeof predicate.right == 'object') ? references.get((predicate.right as trcAst.AttributeReference).variable) : null
+			rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
+		}
+
 		const expr = makeBooleanExpr(predicate.operator, [leftArg, rightArg])
-
 		if (negated) {
 			return makeBooleanExpr('not', [expr])
 		}
