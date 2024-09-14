@@ -56,8 +56,8 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	// NOTE: this is map from tuple variable names to relation names
 	let references = new Map<string, string>()
 
-	// TODO: add right types
-	function makeValueExpr(datatype: any, func: any, args: any): relalgAst.valueExpr {
+	type DataType = 'string' | 'boolean' | 'number' | 'null' | 'date'
+	function makeValueExpr(datatype: DataType, func: relalgAst.ValueExprFunction, args: any[]): relalgAst.valueExpr {
 		return {
 			type: 'valueExpr',
 			datatype,
@@ -67,8 +67,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		}
 	}
 
-	// TODO: add right types
-	function makeBooleanExpr(func: any, args: any) {
+	function makeBooleanExpr(func: relalgAst.ValueExprFunction, args: any[]) {
 		return makeValueExpr('boolean', func, args)
 	}
 
