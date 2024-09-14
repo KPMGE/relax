@@ -82,15 +82,19 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			return value instanceof Date;
 		}
 
+		function isObject(value: any) {
+			return typeof value == 'object'
+		}
+
 		let rightArg = null
 		if (isDate(predicate.right)) {
 			const dateStr = (predicate.right as Date).toISOString().split('T')[0]
 			rightArg = makeValueExpr('date', 'date', [makeValueExpr('string', 'constant', [dateStr])])
 		} else {
-			const func = (typeof predicate.right == 'object') ? 'columnValue' : 'constant'
-			const arg = (typeof predicate.right == 'object') ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
-			const datatype = (typeof predicate.right == 'object') ? 'null' : typeof predicate.right as 'number' | 'string'
-			const rightRelationName = (typeof predicate.right == 'object') ? references.get((predicate.right as trcAst.AttributeReference).variable) : null
+			const func = isObject(predicate.right) ? 'columnValue' : 'constant'
+			const arg = isObject(predicate.right) ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
+			const datatype = isObject(predicate.right) ? 'null' : typeof predicate.right as 'number' | 'string'
+			const rightRelationName = references.get((predicate?.right as trcAst.AttributeReference)?.variable) ?? null
 			rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
 		}
 
