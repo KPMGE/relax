@@ -83,7 +83,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 	QUnit.module('Logical implication', () => {
 		QUnit.test('given logical implication, it should return tuples that match the condition', (assert) => {
-			const queryTrc = "{ r | R(r) and r.a > 5 → r.b = 'e' }";
+			const queryTrc = "{ r | R(r) and r.a > 5 ⇒ r.b = 'e' }";
 			// NOTE: p → q ≡ ¬p ∨ q
 			const queryRa = "sigma (a <= 5 or b = 'e') (R)";
 
@@ -95,7 +95,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 		QUnit.module('Negation', () => {
 			QUnit.test('given logical implication, it should not return tuples that match the condition', (assert) => {
-				const queryTrc = "{ r | R(r) and not (r.a > 5 → r.b = 'a') }";
+				const queryTrc = "{ r | R(r) and not (r.a > 5 ⇒ r.b = 'a') }";
 				// NOTE: ¬(A → B) ≡ A ∧ ¬B
 				const queryRa = "sigma (a > 5 and b != 'a') (R)";
 
@@ -355,8 +355,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		});
 
 		QUnit.test('given ∀ operator with tuple variable reference should return tuples that match the condition', (assert) => {
-			const queryTrc1 = '{ r | R(r) and ∀s(S(s) → s.d < r.a) }';
-			const queryTrc2 = '{ r | R(r) and ∀s(S(s) → s.d > r.a) }';
+			const queryTrc1 = '{ r | R(r) and ∀s(S(s) ⇒ s.d < r.a) }';
+			const queryTrc2 = '{ r | R(r) and ∀s(S(s) ⇒ s.d > r.a) }';
 
 			const expectedResult1 = exec_ra('sigma a = 1000 (R)').getResult()
 			const expectedResult2 = exec_ra('sigma a < 1000 (R)').getResult()
@@ -387,8 +387,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('given ∀ operator with tuple variable reference should return tuples that do not match the condition', (assert) => {
-				const queryTrc1 = '{ r | R(r) and not ∀s(S(s) → s.d < r.a) }';
-				const queryTrc2 = '{ r | R(r) and not ∀s(S(s) → s.d > r.a) }';
+				const queryTrc1 = '{ r | R(r) and not ∀s(S(s) ⇒ s.d < r.a) }';
+				const queryTrc2 = '{ r | R(r) and not ∀s(S(s) ⇒ s.d > r.a) }';
 
 				const expectedResult1 = exec_ra('sigma a != 1000 (R)').getResult()
 				const expectedResult2 = exec_ra('sigma a >= 1000 (R)').getResult()

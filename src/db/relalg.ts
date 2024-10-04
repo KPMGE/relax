@@ -134,7 +134,67 @@ export function queryWithReplacedOperatorsFromAst(
 	};
 }
 
+export function queryWithReplacedTRCOperatorsFromAst(
+	query: string,
+	cursor: TextCursor,
+	mode: AutoreplaceOperatorsMode,
+): { query: string, cursor: TextCursor } {
+	if (mode === 'none') {
+		return {
+			query,
+			cursor,
+		};
+	}
 
+	const newOperators = {
+		'math2plain': {
+			'∈': 'in',
+			'∧': 'and',
+			'∨': 'or',
+			'⊻': 'xor',
+			'⊕': 'xor',
+			'¬': 'not',
+			'!': 'not',
+			'≠': '!=',
+			'<>': '!=',
+			'≤': '<=',
+			'≥': '>=',
+			'⇒': '=>',
+			'∃': 'exists',
+			'∀': 'for all',
+		},
+		'plain2math': {
+			'in': '∈',
+			'and': '∧',
+			'or': '∨',
+			'xor': '⊻',
+			'!': '¬',
+			'not': '¬',
+			'!=': '≠',
+			'<>': '≠',
+			'<=': '≤',
+			'>=': '≥',
+			'=>': '⇒',
+			'implies': '⇒',
+			'exists': '∃',
+			'for all': '∀',
+		},
+	};
+	
+	// Naive implementation to replace operators in a TRC query expression
+	// TODO: Walk through AST and replace based on the operator type/name
+	for (const op in newOperators[mode]) {
+		const newOperator = (newOperators[mode] as { [key: string]: string })[op];
+		const oldOperator = op;
+		const regex = new RegExp(oldOperator, 'g');
+		query = query.replace(regex, newOperator);
+	}
+
+	return {
+		query,
+		cursor,
+	};
+}
 
 const pegParserTrc = require('./parser/grammar_trc.pegjs') as any;
 

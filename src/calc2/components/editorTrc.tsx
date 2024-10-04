@@ -5,13 +5,13 @@ import { Item } from "./toolbar";
 import { Group } from 'calc2/store/groups';
 import { Relation } from 'db/exec/Relation';
 import { Result } from "./result";
-import { relalgFromTRCAstRoot, parseTRCSelect } from "db/relalg";
-import { faCalendarAlt } from '@fortawesome/free-solid-svg-icons';
+import { relalgFromTRCAstRoot, parseTRCSelect, AutoreplaceOperatorsMode, queryWithReplacedTRCOperatorsFromAst } from "db/relalg";
+import { faCalendarAlt, faMagic } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconProp } from "@fortawesome/fontawesome-svg-core";
 
 const NUM_TREE_LABEL_COLORS = 6;
-const KEYWORDS_TRC = ['exists', 'forAll', 'and', 'or', 'not', 'implies'];
+const KEYWORDS_TRC = ['in', 'and', 'or', 'xor', 'not', 'implies', 'exists', 'for all'];
 
 interface Props {
 	group: Group,
@@ -19,17 +19,26 @@ interface Props {
 	// relInsertModalToggle: Function,
 }
 
-export class EditorTrc extends React.Component<Props> {
+type State = {
+	autoreplaceOperatorsMode: AutoreplaceOperatorsMode,
+};
+
+export class EditorTrc extends React.Component<Props, State> {
 	private editorBase: EditorBase | null = null;
 
 	constructor(props: Props) {
 		super(props);
+
+		this.state = {
+			autoreplaceOperatorsMode: 'none',
+		};
 
 		this.replaceText = this.replaceText.bind(this);
 	}
 
 	render() {
 		const { group } = this.props;
+		const { autoreplaceOperatorsMode } = this.state;
 		// TODO: move to state
 		const relations: { [name: string]: Relation } = {};
 		group.tables.forEach(table => {
@@ -75,7 +84,18 @@ export class EditorTrc extends React.Component<Props> {
 				linterFunction={(self: EditorBase, editor: CodeMirror.Editor, text: string) => {
 					// TODO: implement proper linter function, for now it just tries to
 					// parse the text and shows the error if it fails on the editor!
-					parseTRCSelect(text)
+					const trcAst = parseTRCSelect(text)
+
+					// replace text (text-magic)
+					if (editor.getDoc().somethingSelected() === false) {
+						const cursorOld: { line: number, ch: number } = editor.getDoc().getCursor();
+						const { query, cursor } = queryWithReplacedTRCOperatorsFromAst(text, { line: cursorOld.line + 1, column: cursorOld.ch + 1 }, autoreplaceOperatorsMode);
+						if (query !== text) {
+							editor.setValue(query);
+							editor.getDoc().setCursor({ line: cursor.line - 1, ch: cursor.column - 1 });
+						}
+					}
+
 					return []
 				}}
 				getHintsFunction={() => {
@@ -90,44 +110,59 @@ export class EditorTrc extends React.Component<Props> {
 				enableInlineRelationEditor={true}
 				toolbar={[
 					{
-						math: false,
+						math: true,
 						items: [
 							{
-								label: '∃',
-								tooltipTitle: 'calc.editors.trc.toolbar.exists',
-								tooltip: 'calc.editors.trc.toolbar.exists',
-								onClick: item => this.replaceText(item, '∃'),
+								label: '{}',
+								onClick: item => this.replaceText(item, '{ }'),
+								tooltipTitle: 'calc.editors.trc.toolbar.expression',
+								tooltip: 'calc.editors.trc.toolbar.expression-content',
 							},
+						]
+					},
+					{
+						math: true,
+						items: [
 							{
-								label: '∀',
-								tooltipTitle: 'calc.editors.trc.toolbar.for-all',
-								tooltip: 'calc.editors.trc.toolbar.for-all',
-								onClick: item => this.replaceText(item, '∀'),
+								label: '∈',
+								tooltipTitle: 'calc.editors.trc.toolbar.membership',
+								tooltip: 'calc.editors.trc.toolbar.membership-content',
+								onClick: item => this.replaceText(item, '∈'),
 							},
+						]
+					},
+					{
+						math: true,
+						items: [
 							{
 								label: '∧',
 								tooltipTitle: 'calc.editors.trc.toolbar.and',
-								tooltip: 'calc.editors.trc.toolbar.and',
+								tooltip: 'calc.editors.trc.toolbar.and-content',
 								onClick: item => this.replaceText(item, '∧'),
 							},
 							{
 								label: '∨',
 								tooltipTitle: 'calc.editors.trc.toolbar.or',
-								tooltip: 'calc.editors.trc.toolbar.or',
+								tooltip: 'calc.editors.trc.toolbar.or-content',
 								onClick: item => this.replaceText(item, '∨'),
 							},
-							{
-								label: '→',
-								tooltipTitle: 'calc.editors.trc.toolbar.implies',
-								tooltip: 'calc.editors.trc.toolbar.implies',
-								onClick: item => this.replaceText(item, '→'),
-							},
+							// {
+							// 	label: '⊻',
+							// 	tooltipTitle: 'calc.editors.trc.toolbar.xor',
+							// 	tooltip: 'calc.editors.trc.toolbar.xor-content',
+							// 	onClick: item => this.replaceText(item, '⊻'),
+							// },
 							{
 								label: '¬',
 								tooltipTitle: 'calc.editors.trc.toolbar.not',
-								tooltip: 'calc.editors.trc.toolbar.not',
+								tooltip: 'calc.editors.trc.toolbar.not-content',
 								onClick: item => this.replaceText(item, '¬'),
 							},
+						]
+					},
+					{
+						math: true,
+						items: [
 							{
 								label: '=',
 								onClick: this.replaceText,
@@ -141,10 +176,16 @@ export class EditorTrc extends React.Component<Props> {
 								tooltip: 'calc.editors.trc.toolbar.not-equals-content',
 							},
 							{
-								label: '≥',
+								label: '<',
 								onClick: this.replaceText,
-								tooltipTitle: 'calc.editors.trc.toolbar.greater-or-equals',
-								tooltip: 'calc.editors.trc.toolbar.greater-or-equals-content',
+								tooltipTitle: 'calc.editors.trc.toolbar.lesser',
+								tooltip: 'calc.editors.trc.toolbar.lesser-content',
+							},
+							{
+								label: '>',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.greater',
+								tooltip: 'calc.editors.trc.toolbar.greater-content',
 							},
 							{
 								label: '≤',
@@ -153,21 +194,98 @@ export class EditorTrc extends React.Component<Props> {
 								tooltip: 'calc.editors.trc.toolbar.lesser-or-equals-content',
 							},
 							{
-								label: <FontAwesomeIcon icon={faCalendarAlt  as IconProp} />,
-								onClick: item => this.replaceText(item, `date('1970-01-01')`),
-								tooltipTitle: 'calc.editors.ra.toolbar.insert-date',
-								tooltip: 'calc.editors.ra.toolbar.insert-date-content',
+								label: '≥',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.greater-or-equals',
+								tooltip: 'calc.editors.trc.toolbar.greater-or-equals-content',
 							},
-						],
+						]
 					},
 					{
 						math: true,
 						items: [
 							{
-								label: <i className="fa fa-calendar" />,
+								label: '⇒',
+								tooltipTitle: 'calc.editors.trc.toolbar.implies',
+								tooltip: 'calc.editors.trc.toolbar.implies-content',
+								onClick: item => this.replaceText(item, '⇒'),
+							},
+							{
+								label: '∃',
+								tooltipTitle: 'calc.editors.trc.toolbar.exists',
+								tooltip: 'calc.editors.trc.toolbar.exists-content',
+								onClick: item => this.replaceText(item, '∃'),
+							},
+							{
+								label: '∀',
+								tooltipTitle: 'calc.editors.trc.toolbar.for-all',
+								tooltip: 'calc.editors.trc.toolbar.for-all-content',
+								onClick: item => this.replaceText(item, '∀'),
+							},
+						]
+					},
+					{
+						math: false,
+						items: [
+							{
+								label: '--',
+								onClick: item => this.replaceText(item, '-- '),
+								tooltipTitle: 'calc.editors.trc.toolbar.single-line-comment',
+								tooltip: 'calc.editors.trc.toolbar.single-line-comment-content',
+							},
+							{
+								label: '/*',
+								onClick: item => this.replaceText(item, '/*  */'),
+								tooltipTitle: 'calc.editors.trc.toolbar.multi-line-comment',
+								tooltip: 'calc.editors.trc.toolbar.multi-line-comment-content',
+							},
+							{
+								label: <FontAwesomeIcon icon={faCalendarAlt  as IconProp} />,
 								onClick: item => this.replaceText(item, `date('1970-01-01')`),
-								tooltipTitle: 'calc.editors.sql.toolbar.insert-date',
-								tooltip: 'calc.editors.sql.toolbar.insert-date-content',
+								tooltipTitle: 'calc.editors.trc.toolbar.insert-date',
+								tooltip: 'calc.editors.trc.toolbar.insert-date-content',
+							},
+						],
+					},
+					{
+						items: [
+							{
+								className: 'dropdownToolbarButton',
+								type: 'dropdown',
+								label: <FontAwesomeIcon className="editorButtonOnSM" icon={faMagic  as IconProp} />,
+								tooltipTitle: 'calc.editors.ra.toolbar.autoreplace-operators.title',
+								tooltip: 'calc.editors.ra.toolbar.autoreplace-operators.header',
+								elements: [
+									{
+										type: 'header',
+										label: <T id="calc.editors.ra.toolbar.autoreplace-operators.header" />,
+									},
+									{
+										type: 'separator',
+									},
+									{
+										label: <T id="calc.editors.trc.toolbar.autoreplace-operators.none" />,
+										value: 'none',
+									},
+									{
+										label: <T id="calc.editors.trc.toolbar.autoreplace-operators.plain2math" />,
+										value: 'plain2math',
+									},
+									{
+										label: <T id="calc.editors.trc.toolbar.autoreplace-operators.math2plain" />,
+										value: 'math2plain',
+									},
+								],
+								value: autoreplaceOperatorsMode,
+								onChange: (value: string) => {
+									this.setState({
+										autoreplaceOperatorsMode: value as AutoreplaceOperatorsMode,
+									}, () => {
+										if(this.editorBase){
+											this.editorBase.forceLinterRun();
+										}
+									});
+								},
 							},
 						],
 					},
