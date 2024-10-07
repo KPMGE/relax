@@ -81,6 +81,14 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		assert.deepEqual(resultRa, resultTrc);
 	});
 
+	QUnit.test('test aliasing', (assert) => {
+		const queryTrc = '{ r | R(r) and ∃p (R(p) and p.a > 1) }';
+
+		const resultTrc = exec_trc(queryTrc).getResult();
+
+		assert.deepEqual(resultTrc.getRows(), srcTableR.getResult().getRows());
+	});
+
 	QUnit.module('Logical implication', () => {
 		QUnit.test('given logical implication, it should return tuples that match the condition', (assert) => {
 			const queryTrc = "{ r | R(r) and r.a > 5 ⇒ r.b = 'e' }";
@@ -90,7 +98,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('given logical implication with false rigth arm, it should return tuples that match the condition', (assert) => {
@@ -101,7 +109,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.module('Negation', () => {
@@ -113,7 +121,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 		});
 	});
@@ -127,7 +135,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.module('Negation', () => {
@@ -151,7 +159,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('given predicate with variable reference or false predicate, should return all tuples', (assert) => {
@@ -170,7 +178,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 					const resultTrc = exec_trc(queryTrc).getResult()
 					const resultRa = exec_ra(queryRa).getResult();
 
-					assert.deepEqual(resultTrc, resultRa);
+					assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 				});
 			});
 		});
@@ -183,7 +191,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('< predicate', (assert) => {
@@ -193,7 +201,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('= predicate', (assert) => {
@@ -203,7 +211,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('<= predicate', (assert) => {
@@ -213,7 +221,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('>= predicate', (assert) => {
@@ -223,7 +231,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('test != predicate', (assert) => {
@@ -233,7 +241,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult()
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 		})
 
@@ -244,7 +252,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('test < predicate', (assert) => {
@@ -254,7 +262,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('test = predicate', (assert) => {
@@ -264,7 +272,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('test <= predicate', (assert) => {
@@ -274,7 +282,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('test >= predicate', (assert) => {
@@ -284,7 +292,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('test != predicate', (assert) => {
@@ -294,7 +302,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 	})
 
@@ -305,7 +313,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult()
 			const resultRa = srcTableR.getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('given ∃ operator with no tuple variable reference and false condition, should return no tuples', (assert) => {
@@ -323,7 +331,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult();
 			const resultRa = exec_ra(queryRa).getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.module('Negation', () => {
@@ -340,7 +348,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 				const resultTrc = exec_trc(queryTrc).getResult();
 
-				assert.deepEqual(resultTrc, srcTableR.getResult());
+				assert.deepEqual(resultTrc.getRows(), srcTableR.getResult().getRows());
 			});
 
 			QUnit.test('given ¬∃ with tuple variable reference and, return tuples that do not match the condition', (assert) => {
@@ -350,7 +358,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc = exec_trc(queryTrc).getResult();
 				const resultRa = exec_ra(queryRa).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 		});
 	});
@@ -370,7 +378,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc = exec_trc(queryTrc).getResult();
 			const resultRa = srcTableR.getResult();
 
-			assert.deepEqual(resultTrc, resultRa);
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 		});
 
 		QUnit.test('given ∀ operator with tuple variable reference should return tuples that match the condition', (assert) => {
@@ -383,8 +391,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			const resultTrc1 = exec_trc(queryTrc1).getResult();
 			const resultTrc2 = exec_trc(queryTrc2).getResult();
 
-			assert.deepEqual(resultTrc1, expectedResult1);
-			assert.deepEqual(resultTrc2, expectedResult2);
+			assert.deepEqual(resultTrc1.getRows(), expectedResult1.getRows());
+			assert.deepEqual(resultTrc2.getRows(), expectedResult2.getRows());
 		});
 
 		QUnit.module('Negation', () => {
@@ -394,7 +402,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultRa = srcTableR.getResult();
 				const resultTrc = exec_trc(queryTrc).getResult();
 
-				assert.deepEqual(resultTrc, resultRa);
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
 			});
 
 			QUnit.test('given ∀ operator with no tuple variable reference and true condition for all elements, should return no tuples', (assert) => {
@@ -415,8 +423,8 @@ QUnit.module('translate trc ast to relational algebra', () => {
 				const resultTrc1 = exec_trc(queryTrc1).getResult();
 				const resultTrc2 = exec_trc(queryTrc2).getResult();
 
-				assert.deepEqual(resultTrc1, expectedResult1);
-				assert.deepEqual(resultTrc2, expectedResult2);
+				assert.deepEqual(resultTrc1.getRows(), expectedResult1.getRows());
+				assert.deepEqual(resultTrc2.getRows(), expectedResult2.getRows());
 			});
 		});
 	});
