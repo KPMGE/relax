@@ -203,10 +203,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			case 'LogicalExpression': {
 				switch (nRaw.operator) {
 					case 'implies': {
-						if (nRaw.left.type === 'RelationPredicate') {
-							return rec(nRaw.right, baseRel, negated)
-						}
-
 						// NOTE: ¬(p → q) ≡ p ∧ ¬q
 						if (negated) {
 							return rec(and(nRaw.left, not(nRaw.right)), baseRel)
@@ -217,10 +213,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					}
 
 					case 'or': {
-						if (nRaw.left.type === 'RelationPredicate') {
-							return rec(nRaw.right, baseRel, negated)
-						}
-
 						// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
 						if (negated) {
 							return rec(and(not(nRaw.left), not((nRaw.right))), baseRel)
