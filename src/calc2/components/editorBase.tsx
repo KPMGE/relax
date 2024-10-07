@@ -41,9 +41,9 @@ require('codemirror/mode/sql/sql.js');
 require('handsontable/dist/handsontable.full.css');
 
 CodeMirror.defineMode('trc', function () {
-	const keywords = ['exists', 'forAll', 'and', 'or', 'not', 'implies', 'empty'];
-	const keywordsMath = ['∅', '∀', '∃'];
-	const operators = ['∧', '∨', '=', '¬', '→'];
+	const keywords = ['in', 'and', 'or', 'xor', 'not', 'implies', 'exists', 'for all', 'empty'];
+	const keywordsMath = ['∈', '∃', '∀', '∅'];
+	const operators = ['∧', '∨', '⊻', '⊕', '¬', '=', '≠', '≤', '≥', '<', '>', '⇒'];
 	const matchAny = (
 		stream: CodeMirror.StringStream,
 		array: string[],

@@ -18,138 +18,246 @@
   function createNegation(formula) {
     return { type: 'Negation', formula };
   }
-
-	function translateLogicalOperator(op) {
-		const operators = {
-			'∨': 'or',
-			'∧': 'and',
-			'→': 'implies',
-		}
-		return operators[op] ? operators[op] : op
-	}
-
-	function translateRelationalOperator(op) {
-		const operators = {
-			'≠': '!=',
-			'≤': '<=',
-			'≥': '>='
-		}
-		return operators[op] ? operators[op] : op
-	}
 }
 
-start = _ expr: TRC_Expr _ {
-	return expr
-}
+start
+  = _ expr: TRC_Expr _
+    {
+      return expr
+    }
 
-dbDumpStart = dbDumpRoot
-dbDumpRoot = a: all {
-	return {
-		type: 'groupRoot',
-		groups: [],
-		codeInfo: undefined,
-	}
-}
+dbDumpStart
+  = dbDumpRoot
 
-all = chs: .* {
-  return chs.join('')
-}
+dbDumpRoot
+  = a: all
+    {
+      return {
+        type: 'groupRoot',
+        groups: [],
+        codeInfo: undefined,
+      }
+    }
+
+all
+  = chs: .*
+    {
+      return chs.join('')
+    }
 
 TRC_Expr
-  = '{' _ variable:Variable _ '|' _ formula:Formula _ '}' {
+  = '{' _ variable:Variable _ '|' _ formula:Formula _ '}'
+    {
       return { type: 'TRC_Expr', variable, formula, projections: [] };
     }
-		/
-		'{' _ projections:Projections _ '|' _ formula:Formula _ '}' {
-			const variable = projections[0].variable
-			const attributeNames = projections.map(p => p.attribute)
+  / '{' _ projections:Projections _ '|' _ formula:Formula _ '}'
+    {
+      const variable = projections[0].variable
+      const attributeNames = projections.map(p => p.attribute)
       return { type: 'TRC_Expr', variable, formula, projections: attributeNames };
-		}
+    }
 
 Formula = LogicalExpression
 
 LogicalExpression 
-	= left:BaseFormula right:(_ LogicOp _ BaseFormula)* {
+  = left:BaseFormula right:(_ LogicOp _ BaseFormula)*
+    {
       return right.reduce((result, element) => {
-			  const op = translateLogicalOperator(element[1])
+        const op = element[1]
         return createLogicalExpression(result, op, element[3]);
       }, left);
     }
 
-AtomicFormula = RelationPredicate / Predicate
+AtomicFormula
+  = RelationPredicate
+  / Predicate
 
 BaseFormula 
-	=	AtomicFormula 
-	/
-	('not' / '¬') _ formula:BaseFormula {
+  =	AtomicFormula 
+  / not _ formula:BaseFormula
+    {
       return createNegation(formula);
     }
-  / '(' _ formula:Formula _ ')' {
+  / '(' _ formula:Formula _ ')'
+    {
       return formula;
     }
-  / ('exists' / '∃') _ variable:Variable _ '(' _ formula:Formula _ ')' {
+  / existentialQuantifier _ variable:Variable _ '(' _ formula:Formula _ ')'
+    {
       return createQuantifiedExpression('exists', variable, formula);
     }
-  / ('forAll' / '∀') _ variable:Variable _ '(' _ formula:Formula _ ')' {
+  / '(' _ existentialQuantifier _ variable:Variable  _ ')' _ '(' _ formula:Formula _ ')'
+    {
+      return createQuantifiedExpression('exists', variable, formula);
+    }
+  / universalQuantifier _ variable:Variable _ '(' _ formula:Formula _ ')'
+    {
+      return createQuantifiedExpression('forAll', variable, formula);
+    }
+  / '(' _ universalQuantifier _ variable:Variable _ ')' _ '(' _ formula:Formula _ ')'
+    {
       return createQuantifiedExpression('forAll', variable, formula);
     }
 
+existentialQuantifier
+  = 'exists'i
+  / '∃'
+
+universalQuantifier
+  = 'for all'i
+  / '∀'
+
+quantifier
+  = existentialQuantifier
+  / universalQuantifier
+
 RelationPredicate
-  = relation:Relation '(' variable:Variable ')' {
+  = relation:Relation _ '(' _ variable:Variable _ ')'
+    {
+      return createRelationPredicate(relation, variable);
+    }
+  / variable:Variable _ ('in'i / '∈') _ relation:Relation
+    {
       return createRelationPredicate(relation, variable);
     }
 
 Predicate
-  = left:AttributeReference _ operator:RelOp _ right:Value {
-      return createPredicate(left, translateRelationalOperator(operator), right);
+  = left:AttributeReference _ operator:RelOp _ right:Value
+    {
+      return createPredicate(left, operator, right);
     }
-  / left:AttributeReference _ operator:RelOp _ right:AttributeReference {
-      return createPredicate(left, translateRelationalOperator(operator), right);
+  / left:AttributeReference _ operator:RelOp _ right:AttributeReference
+    {
+      return createPredicate(left, operator, right);
     }
 
 AttributeReference
-  = variable:Variable '.' attribute:Attribute {
+  = variable:Variable '.' attribute:Attribute
+    {
+      return { type: 'AttributeReference', variable, attribute };
+    }
+  / variable:Variable _ '[' _ attribute:Attribute _ ']'
+    {
       return { type: 'AttributeReference', variable, attribute };
     }
 
-RelOp = ('=' / '!=' / '<=' / '>=' / '<' / '>' / '≠' / '≤' / '≥')
+comparisonOperatorEquals
+  = '='
 
-LogicOp = ('or' / '∨' / 'and' / '∧' / 'implies' / '→')
+comparisonOperatorNotEquals
+  = ('!=' / '<>' / '≠')
+    {
+      return '!=';
+    }
+
+comparisonOperatorGreaterEquals
+  = ('>=' / '≥')
+    {
+      return '>=';
+    }
+
+comparisonOperatorGreater
+  = '>'
+
+comparisonOperatorLesserEquals
+  = ('<=' / '≤')
+    {
+      return '<=';
+    }
+
+comparisonOperatorLesser
+  = '<'
+
+RelOp
+  = comparisonOperatorEquals
+  / comparisonOperatorNotEquals
+  / comparisonOperatorGreaterEquals
+  / comparisonOperatorLesserEquals
+  / comparisonOperatorGreater
+  / comparisonOperatorLesser
+
+and 'logical AND'
+  = ('and'i / '∧')
+    {
+      return 'and';
+    }
+
+or 'logical OR'
+  = ('or'i	/ '∨')
+    {
+      return 'or';
+    }
+
+xor 'logical XOR'
+  = ('xor'i / '⊻' / '⊕')
+    {
+      return 'xor';
+    }
+
+implication 'logical IMPLICATION'
+  = ('implies'i / '=>' / '⇒')
+    {
+      return 'implies';
+    }
+
+not 'logical NOT'
+  = ('not'i / '!' / '¬')
+    {
+      return '!';
+    }
+
+LogicOp
+  = and
+  / or
+  / xor
+  / implication
 
 Variable
-  = [a-zA-Z_][a-zA-Z0-9_]* {
+  = [a-zA-Z_][a-zA-Z0-9_]*
+    {
       return text();
     }
 
 Attribute
-  = [a-zA-Z_][a-zA-Z0-9_]* {
+  = [a-zA-Z_][a-zA-Z0-9_]*
+    {
       return text();
     }
 
 Value
-  = 'date'i '(\'' d: DateIso '\')' {
-		return d;
-	}
-	/
-	"'" chars:[^']* "\'" {
+  = 'date'i '(\'' d: DateIso '\')'
+    {
+      return d;
+    }
+  /
+  "'" chars:[^']* "\'"
+    {
       return chars.join('');
     }
-  / digits:[0-9]+ {
+  / digits:[0-9]+
+    {
       return parseInt(digits.join(''), 10);
     }
 
 Relation
-  = [a-zA-Z_][a-zA-Z0-9_]* {
+  = [a-zA-Z_][a-zA-Z0-9_]*
+    {
       return text();
     }
 
 Projections
-  = p: Projection pl: ("," _ Projection)* {
+  = p: Projection pl: ("," _ Projection)*
+    {
       return [p].concat(pl.map(p => p[2]))
     }
 
 Projection
-  = variable:Variable "." attribute:Variable {
+  = variable:Variable "." attribute:Variable
+    {
+      return { variable, attribute }
+    }
+  / variable:Variable _ '[' _ attribute:Variable _ ']'
+    {
       return { variable, attribute }
     }
 
@@ -160,7 +268,8 @@ WhiteSpace
   = [ \t\n\r]
 
 Comment
-  = SingleLineComment / MultiLineComment
+  = SingleLineComment
+  / MultiLineComment
 
 SingleLineComment
   = '--' (![\n\r] .)*
@@ -169,15 +278,15 @@ MultiLineComment
   = '/*' (!'*/' .)* '*/'
 
 DateIso 'date in ISO format (YYYY-MM-DD)'
-= year:$([0-9][0-9][0-9][0-9]) '-' month:$([0-9][0-9]) '-' day:$([0-9][0-9])
-	{
-		year = parseInt(year, 10);
-		month = parseInt(month, 10)-1;
-		day = parseInt(day, 10);
-		var date = new Date(year, month, day);
+  = year:$([0-9][0-9][0-9][0-9]) '-' month:$([0-9][0-9]) '-' day:$([0-9][0-9])
+    {
+      year = parseInt(year, 10);
+      month = parseInt(month, 10)-1;
+      day = parseInt(day, 10);
+      var date = new Date(year, month, day);
 
-		if(date.getFullYear() != year || date.getMonth() != month ||  date.getDate() != day){
-			error(t('db.messages.parser.error-invalid-date-format', {str: text()}));
-		}
-		return date;
-	}
+      if(date.getFullYear() != year || date.getMonth() != month ||  date.getDate() != day){
+        error(t('db.messages.parser.error-invalid-date-format', {str: text()}));
+      }
+      return date;
+    }
