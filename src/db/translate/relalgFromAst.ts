@@ -72,7 +72,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 	}
 
 	function convertPredicate(predicate: trcAst.Predicate, negated: boolean = false): relalgAst.valueExpr {
-		const leftRelationName = references.get(predicate.left.variable) ?? null
+		const leftRelationName = predicate.left.variable ?? null
 		const leftArg = makeValueExpr('null', 'columnValue', [
 			predicate.left.attribute,
 			leftRelationName
@@ -91,11 +91,11 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			const dateStr = (predicate.right as Date).toISOString().split('T')[0]
 			rightArg = makeValueExpr('date', 'date', [makeValueExpr('string', 'constant', [dateStr])])
 		} else {
-			const func = isObject(predicate.right) ? 'columnValue' : 'constant'
-			const arg = isObject(predicate.right) ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
-			const datatype = isObject(predicate.right) ? 'null' : typeof predicate.right as 'number' | 'string'
-			const rightRelationName = references.get((predicate?.right as trcAst.AttributeReference)?.variable) ?? null
-			rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
+		const func = isObject(predicate.right) ? 'columnValue' : 'constant'
+		const arg = isObject(predicate.right) ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
+		const datatype = isObject(predicate.right) ? 'null' : typeof predicate.right as 'number' | 'string'
+		const rightRelationName =  (predicate?.right as trcAst.AttributeReference)?.variable ?? null
+		rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
 		}
 
 		const expr = makeBooleanExpr(predicate.operator, [leftArg, rightArg])
@@ -106,13 +106,23 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return expr
 	}
 
-	function setupReferences(root: any) {
+	function getRelationPredicate(root: any, scopeChanges = 0): trcAst.RelationPredicate | null {
+		// NOTE: this represents that the scope has changed, so it doesn't make sense to keep searching
+		if (scopeChanges >= 2) {
+			return null
+		}
+
 		switch (root.type) {
-			case 'TRC_Expr': { setupReferences(root.formula) } break
-			case 'RelationPredicate': { references.set(root.variable, root.relation) } break
-			case 'Negation': { setupReferences(root.formula) } break
-			case 'QuantifiedExpression': { setupReferences(root.formula) } break
-			case 'LogicalExpression': { setupReferences(root.left); setupReferences(root.right) } break
+			case 'TRC_Expr': return getRelationPredicate(root.formula, ++scopeChanges)
+			case 'RelationPredicate': return root
+			case 'Negation': return getRelationPredicate(root.formula, scopeChanges)
+			case 'QuantifiedExpression': return getRelationPredicate(root.formula, ++scopeChanges)
+			case 'LogicalExpression': {
+				const left =  getRelationPredicate(root.left, scopeChanges) 
+				const right = getRelationPredicate(root.right, scopeChanges)
+				return left ?? right
+			}
+			default: return null
 		}
 	}
 
@@ -135,20 +145,17 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		formula
 	})
 
-	const getRelationByReference = (refName: string | null): Relation => {
-		if (!refName) {
-			throw new Error('refName must not be null')
-		}
-
-		const relName = references.get(refName)
-		if (!relName) throw new Error(`Could not find relation with name: ${relName}`)
-		return relations[relName].copy()
-	}
-
 	function rec(nRaw: trcAst.TRC_Expr | any, baseRel: RANode | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
-				const tupleRel = getRelationByReference(nRaw.variable)
+				const relationPredicate = getRelationPredicate(nRaw)
+
+				if (!relationPredicate) {
+					throw new Error('Relation predicate must be defined!')
+				}
+
+				const tupleRel =  relations[relationPredicate.relation].copy()
+				const renamed = new RenameRelation(tupleRel, relationPredicate.variable)
 
 				if (!tupleRel) {
 					throw new Error("Could not get the tuple relation by its reference!")
@@ -156,10 +163,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 				if (nRaw.projections.length > 0) {
 					const projections = nRaw.projections.map((c: string) => new Column(c, null))
-					return new Projection(rec(nRaw.formula, tupleRel), projections)
+					return new Projection(rec(nRaw.formula, renamed), projections)
 				}
 
-				return rec(nRaw.formula, tupleRel)
+				return rec(nRaw.formula, renamed)
 			}
 
 			case 'QuantifiedExpression': {
@@ -169,8 +176,15 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							throw new Error('Base relation is null!')
 						}
 
-						const quantifiedRel = getRelationByReference(nRaw.variable)
-						const newBaseRel = new CrossJoin(quantifiedRel, baseRel)
+						const relationPredicate = getRelationPredicate(nRaw)
+						if (!relationPredicate) {
+							throw new Error('Relation predicate must be defined!')
+						}
+
+						const relation = relations[relationPredicate.relation].copy()
+						const renamed = new RenameRelation(relation, relationPredicate.variable)
+						const newBaseRel = new CrossJoin(renamed, baseRel)
+
 						if (negated) {
 							const right = rec(nRaw.formula, newBaseRel, false)
 							return new Difference(baseRel, new SemiJoin(baseRel, right, true))
@@ -228,6 +242,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							return rec(nRaw.right, baseRel, negated)
 						}
 
+						if (nRaw.right.type === 'RelationPredicate') {
+							return rec(nRaw.left, baseRel, negated)
+						}
+
 						// NOTE: ¬(p ∧ q) ≡ ¬p ∨ ¬q
 						if (negated) {
 							return rec(or(not(nRaw.left), not((nRaw.right))), baseRel)
@@ -259,7 +277,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		}
 	}
 
-	setupReferences(astRoot)
 	return rec(astRoot)
 }
 
