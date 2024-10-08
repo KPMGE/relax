@@ -222,6 +222,12 @@ export class EditorTrc extends React.Component<Props, State> {
 								tooltip: 'calc.editors.trc.toolbar.for-all-content',
 								onClick: item => this.replaceText(item, '∀'),
 							},
+							{
+								label: '→',
+								onClick: this.replaceText,
+								tooltipTitle: 'calc.editors.trc.toolbar.right-arrow',
+								tooltip: 'calc.editors.trc.toolbar.right-arrow-content',
+							},
 						]
 					},
 					{

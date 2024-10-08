@@ -155,18 +155,28 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				}
 
 				const tupleRel =  relations[relationPredicate.relation].copy()
-				const renamed = new RenameRelation(tupleRel, relationPredicate.variable)
+				const renamedRel = new RenameRelation(tupleRel, relationPredicate.variable)
 
 				if (!tupleRel) {
 					throw new Error("Could not get the tuple relation by its reference!")
 				}
 
 				if (nRaw.projections.length > 0) {
-					const projections = nRaw.projections.map((c: string) => new Column(c, null))
-					return new Projection(rec(nRaw.formula, renamed), projections)
+					const form = rec(nRaw.formula, renamedRel)
+
+					const renamedCols = new RenameColumns(form)
+
+					nRaw.projections.forEach((proj: trcAst.Projection) => {
+						if (proj.alias) {
+							renamedCols.addRenaming(proj.alias, proj.attribute, null)
+						}
+					})
+
+					const projCols = nRaw.projections.map((c: trcAst.Projection) => new Column(c.alias ?? c.attribute, null))
+					return new Projection(renamedCols, projCols)
 				}
 
-				return rec(nRaw.formula, renamed)
+				return rec(nRaw.formula, renamedRel)
 			}
 
 			case 'QuantifiedExpression': {
