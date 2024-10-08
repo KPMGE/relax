@@ -462,6 +462,8 @@
     "calc.editors.trc.toolbar.autoreplace-operators.plain2math": "exists => ∃",
     "calc.editors.trc.toolbar.autoreplace-operators.math2plain": "∃ => exists",
     "calc.editors.trc.toolbar.empty": "empty set",
+		"calc.editors.trc.toolbar.right-arrow": "rename columns operator",
+		"calc.editors.trc.toolbar.right-arrow-content": "<div class=\"math\"> { r.a<b class=\"math\">\u2192</b>y | R(r) }</div>",
     "calc.result.modal.title": "Result",
     "calc.result.modal.close": "Close",
     "calc.editors.ra.inline-editor.title": "Relation Editor",

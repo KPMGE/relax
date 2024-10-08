@@ -81,7 +81,17 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		assert.deepEqual(resultRa, resultTrc);
 	});
 
-	QUnit.test('test aliasing', (assert) => {
+	QUnit.test('test tuple variable renaming', (assert) => {
+		const queryTrc = '{ r.a->x, r.b->y, r.c->z | R(r) }';
+		const queryRa = 'pi x, y, z (ρ x←a, y←b, z←c R)';
+
+		const resultTrc = exec_trc(queryTrc).getResult();
+		const resultRa = exec_ra(queryRa).getResult();
+
+		assert.deepEqual(resultRa, resultTrc);
+	});
+
+	QUnit.test('test formula aliasing', (assert) => {
 		const queryTrc = '{ r | R(r) and ∃p (R(p) and p.a > 1) }';
 
 		const resultTrc = exec_trc(queryTrc).getResult();

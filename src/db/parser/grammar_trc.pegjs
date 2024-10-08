@@ -18,6 +18,10 @@
   function createNegation(formula) {
     return { type: 'Negation', formula };
   }
+
+	function createProjection(variable, attribute, alias = null) {
+		return { variable, attribute, alias };
+	}
 }
 
 start
@@ -52,9 +56,8 @@ TRC_Expr
     }
   / '{' _ projections:Projections _ '|' _ formula:Formula _ '}'
     {
-      const variable = projections[0].variable
-      const attributeNames = projections.map(p => p.attribute)
-      return { type: 'TRC_Expr', variable, formula, projections: attributeNames };
+			const variable = projections[0].variable
+      return { type: 'TRC_Expr', variable, formula, projections };
     }
 
 Formula = LogicalExpression
@@ -212,12 +215,6 @@ LogicOp
   / xor
   / implication
 
-Variable
-  = [a-zA-Z_][a-zA-Z0-9_]*
-    {
-      return text();
-    }
-
 Attribute
   = [a-zA-Z_][a-zA-Z0-9_]*
     {
@@ -239,11 +236,19 @@ Value
       return parseInt(digits.join(''), 10);
     }
 
-Relation
+String
   = [a-zA-Z_][a-zA-Z0-9_]*
     {
       return text();
     }
+
+Relation = String
+
+Alias = String
+
+Variable = String
+
+Arrow = ('->' / '→')
 
 Projections
   = p: Projection pl: ("," _ Projection)*
@@ -252,13 +257,21 @@ Projections
     }
 
 Projection
-  = variable:Variable "." attribute:Variable
+  = variable:Variable "." attribute:Variable _ Arrow _ alias:Alias
+		{
+			return createProjection(variable, attribute, alias)
+		}
+	/ variable:Variable _ '[' _ attribute:Variable _ ']' _ Arrow  _ alias:Alias
+		{
+			return createProjection(variable, attribute, alias)
+		}
+	/ variable:Variable "." attribute:Variable 
     {
-      return { variable, attribute }
+			return createProjection(variable, attribute)
     }
   / variable:Variable _ '[' _ attribute:Variable _ ']'
     {
-      return { variable, attribute }
+			return createProjection(variable, attribute)
     }
 
 _ "whitespace"
