@@ -193,6 +193,31 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 		});
 
+		QUnit.module('Exclusive disjunction', () => {
+			QUnit.test('given predicate with exclusive disjunction, when one and only one of the conditions is true, should return tuples', (assert) => {
+				const queryTrc = '{ t | R(t) and (t.a < 3 xor t.a >= 3) }';
+				// NOTE: p ⊻ q = (p ∨ q) ∧ (¬p ∨ ¬q)
+				const queryRa = 'sigma (a < 3 or a >= 3) and (!(a < 3) or !(a >= 3)) (R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
+			});
+
+			QUnit.module('Negation', () => {
+				QUnit.test('given predicate with exclusive disjunction, when one and only one of the conditions is true, should return tuples', (assert) => {
+					const queryTrc = '{ t | R(t) and !(t.a < 3 xor t.a >= 3) }';
+					const queryRa = 'sigma (!(a < 3) and !(a >= 3)) or (a < 3 and a >= 3) (R)';
+
+					const resultTrc = exec_trc(queryTrc).getResult().getRows().sort()
+					const resultRa = exec_ra(queryRa).getResult().getRows().sort()
+
+					assert.deepEqual(resultTrc, resultRa);
+				});
+			});
+		});
+
 		QUnit.module('Negation', () => {
 			QUnit.test('> predicate', (assert) => {
 				const queryTrc = '{ t | R(t) and not(t.a > 3) }';

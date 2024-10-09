@@ -43,7 +43,7 @@ require('handsontable/dist/handsontable.full.css');
 CodeMirror.defineMode('trc', function () {
 	const keywords = ['in', 'and', 'or', 'xor', 'not', 'implies', 'exists', 'for all', 'empty'];
 	const keywordsMath = ['∈', '∃', '∀', '∅'];
-	const operators = ['∧', '∨', '⊻', '⊕', '¬', '=', '≠', '≤', '≥', '<', '>', '⇒'];
+	const operators = ['←', '→', '∧', '∨', '⊻', '⊕', '⇒', '¬', '=', '≠', '≤', '≥', '<', '>'];
 	const matchAny = (
 		stream: CodeMirror.StringStream,
 		array: string[],

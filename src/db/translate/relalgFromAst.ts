@@ -198,6 +198,26 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						return rec(or(not(nRaw.left), nRaw.right), baseRel)
 					}
 
+					case 'xor': {
+						// NOTE: p ⊻ q = (p ∨ q) ∧ (¬p ∨ ¬q)
+						if (negated) {
+							// ¬(p ⊻ q) = (¬p ∧ ¬q) ∨ (p ∧ q)
+							return rec(
+								or(
+									and(
+										not(nRaw.left), not(nRaw.right)
+									),
+									and(nRaw.left, nRaw.right)
+								),
+								baseRel
+							)
+						}
+
+						const left = rec(or(nRaw.left, nRaw.right), baseRel) as RANode
+						const right = rec(or(not(nRaw.left), not(nRaw.right)), baseRel) as RANode
+						return new Intersect(left, right)
+					}
+
 					case 'or': {
 						// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
 						if (negated) {

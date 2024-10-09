@@ -167,7 +167,17 @@ Alias = String
 
 Variable = String
 
-Arrow = ('->' / '→')
+LeftArrow
+  = ('<-' / '←')
+    {
+      return '<-';
+    }
+
+RightArrow
+  = ('->' / '→')
+    {
+      return '->';
+    }
 
 Projections
   = p: Projection pl: ("," _ Projection)*
@@ -176,11 +186,19 @@ Projections
     }
 
 Projection
-  = variable:Variable "." attribute:Variable _ Arrow _ alias:Alias
+  = variable:Variable "." attribute:Variable _ RightArrow _ alias:Alias
 		{
 			return createProjection(variable, attribute, alias)
 		}
-	/ variable:Variable _ '[' _ attribute:Variable _ ']' _ Arrow  _ alias:Alias
+	/ variable:Variable _ '[' _ attribute:Variable _ ']' _ RightArrow  _ alias:Alias
+		{
+			return createProjection(variable, attribute, alias)
+		}
+  / alias:Alias _ LeftArrow _ variable:Variable "." attribute:Variable
+		{
+			return createProjection(variable, attribute, alias)
+		}
+	/ alias:Alias _ LeftArrow  _ variable:Variable _ '[' _ attribute:Variable _ ']'
 		{
 			return createProjection(variable, attribute, alias)
 		}
