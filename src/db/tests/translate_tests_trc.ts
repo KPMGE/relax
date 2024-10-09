@@ -399,6 +399,15 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	});
 
 	QUnit.module('universal operator(∀)', () => {
+		QUnit.test('given ∀ operator with relation predicate, should return all tuples', (assert) => {
+			const queryTrc = '{ t | R(t) and ∀s(S(s)) }';
+
+			const resultTrc = exec_trc(queryTrc).getResult();
+			const resultRa = srcTableR.getResult();
+
+			assert.deepEqual(resultTrc.getRows(), resultRa.getRows());
+		});
+
 		QUnit.test('given ∀ operator with no tuple variable reference and true condition for some elements but not all, should return no tuples', (assert) => {
 			const queryTrc = '{ t | R(t) and ∀s(S(s) and s.d > 300) }';
 
