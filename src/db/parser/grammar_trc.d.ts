@@ -31,9 +31,7 @@ declare namespace trcAst {
 
 	interface Predicate {
 		type: 'Predicate',
-		left: AttributeReference,
-		operator: Operator,
-		right: AttributeReference | string | number | Date
+		condition: relalgAst.valueExpr
 	}
 
 	interface AttributeReference {

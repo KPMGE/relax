@@ -53,9 +53,6 @@ function parseJoinCondition(condition: relalgAst.booleanExpr | string[] | null):
 
 // translate a TRC-AST to RA
 export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations: { [key: string]: Relation }): RANode {
-	// NOTE: this is map from tuple variable names to relation names
-	let references = new Map<string, string>()
-
 	type DataType = 'string' | 'boolean' | 'number' | 'null' | 'date'
 	function makeValueExpr(datatype: DataType, func: relalgAst.ValueExprFunction, args: any[]): relalgAst.valueExpr {
 		return {
@@ -69,41 +66,6 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 
 	function makeBooleanExpr(func: relalgAst.ValueExprFunction, args: any[]) {
 		return makeValueExpr('boolean', func, args)
-	}
-
-	function convertPredicate(predicate: trcAst.Predicate, negated: boolean = false): relalgAst.valueExpr {
-		const leftRelationName = predicate.left.variable ?? null
-		const leftArg = makeValueExpr('null', 'columnValue', [
-			predicate.left.attribute,
-			leftRelationName
-		])
-
-		function isDate(value: any) {
-			return value instanceof Date;
-		}
-
-		function isObject(value: any) {
-			return typeof value == 'object'
-		}
-
-		let rightArg = null
-		if (isDate(predicate.right)) {
-			const dateStr = (predicate.right as Date).toISOString().split('T')[0]
-			rightArg = makeValueExpr('date', 'date', [makeValueExpr('string', 'constant', [dateStr])])
-		} else {
-		const func = isObject(predicate.right) ? 'columnValue' : 'constant'
-		const arg = isObject(predicate.right) ? (predicate.right as trcAst.AttributeReference).attribute : predicate.right
-		const datatype = isObject(predicate.right) ? 'null' : typeof predicate.right as 'number' | 'string'
-		const rightRelationName =  (predicate?.right as trcAst.AttributeReference)?.variable ?? null
-		rightArg = makeValueExpr(datatype, func, [arg, rightRelationName])
-		}
-
-		const expr = makeBooleanExpr(predicate.operator, [leftArg, rightArg])
-		if (negated) {
-			return makeBooleanExpr('not', [expr])
-		}
-
-		return expr
 	}
 
 	function getRelationPredicate(root: any, scopeChanges = 0): trcAst.RelationPredicate | null {
@@ -282,7 +244,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 				if (!baseRel) {
 					throw new Error('Base relation is null!')
 				}
-				return new Selection(baseRel, recValueExpr(convertPredicate(nRaw, negated)))
+
+				if (negated) {
+					return new Selection(baseRel, recValueExpr(makeBooleanExpr('not', [nRaw.condition])))
+				}
+
+				return new Selection(baseRel, recValueExpr(nRaw.condition))
 			}
 		}
 	}

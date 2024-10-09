@@ -195,7 +195,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 		QUnit.module('Negation', () => {
 			QUnit.test('> predicate', (assert) => {
-				const queryTrc = '{ t | R(t) and not t.a > 3 }';
+				const queryTrc = '{ t | R(t) and not(t.a > 3) }';
 				const queryRa = 'sigma a <= 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
@@ -205,7 +205,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('< predicate', (assert) => {
-				const queryTrc = '{ t | R(t) and not t.a < 3 }';
+				const queryTrc = '{ t | R(t) and not(t.a < 3) }';
 				const queryRa = 'sigma a >= 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
@@ -215,7 +215,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('= predicate', (assert) => {
-				const queryTrc = '{ t | R(t) and not t.a = 3 }';
+				const queryTrc = '{ t | R(t) and not(t.a = 3) }';
 				const queryRa = 'sigma a != 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
@@ -225,7 +225,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('<= predicate', (assert) => {
-				const queryTrc = '{ t | R(t) and not t.a <= 3 }';
+				const queryTrc = '{ t | R(t) and not(t.a <= 3) }';
 				const queryRa = 'sigma a > 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
@@ -235,7 +235,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('>= predicate', (assert) => {
-				const queryTrc = '{ t | R(t) and not t.a >= 3 }';
+				const queryTrc = '{ t | R(t) and not(t.a >= 3) }';
 				const queryRa = 'sigma a < 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
@@ -245,7 +245,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			});
 
 			QUnit.test('test != predicate', (assert) => {
-				const queryTrc = '{ t | R(t) and not t.a != 3 }';
+				const queryTrc = '{ t | R(t) and not(t.a != 3) }';
 				const queryRa = 'sigma a = 3 (R)';
 
 				const resultTrc = exec_trc(queryTrc).getResult()
