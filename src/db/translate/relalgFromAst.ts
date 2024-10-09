@@ -179,6 +179,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							formula: not(nRaw.formula)
 						}
 
+						if (nRaw.formula.type === 'RelationPredicate') {
+							return rec({ ...exists, formula: nRaw.formula }, baseRel)
+						}
+ 
 						// NOTE: ¬∀xP(x) ≡ ∃x(¬P(x))
 						if (negated) {
 							return rec(exists, baseRel)
