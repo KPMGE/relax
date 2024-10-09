@@ -82,6 +82,12 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			case 'LogicalExpression': {
 				const left =  getRelationPredicate(root.left, scopeChanges) 
 				const right = getRelationPredicate(root.right, scopeChanges)
+
+				// NOTE: if more than one relationPredicate was encountered
+				if (left && right) {
+					throw new Error('Cannot define RelationPredicate more than once per scope!')
+				}
+
 				return left ?? right
 			}
 			default: return null
