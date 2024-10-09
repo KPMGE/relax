@@ -11,7 +11,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconProp } from "@fortawesome/fontawesome-svg-core";
 
 const NUM_TREE_LABEL_COLORS = 6;
-const KEYWORDS_TRC = ['in', 'and', 'or', 'xor', 'not', 'implies', 'exists', 'for all'];
+const KEYWORDS_TRC = ['in', 'and', 'or', 'xor', 'implies', 'not', 'exists', 'for all'];
 
 interface Props {
 	group: Group,
@@ -135,6 +135,23 @@ export class EditorTrc extends React.Component<Props, State> {
 						math: true,
 						items: [
 							{
+								label: '←',
+								tooltipTitle: 'calc.editors.trc.toolbar.left-arrow',
+								tooltip: 'calc.editors.trc.toolbar.left-arrow-content',
+								onClick: item => this.replaceText(item, '←'),
+							},
+							{
+								label: '→',
+								tooltipTitle: 'calc.editors.trc.toolbar.right-arrow',
+								tooltip: 'calc.editors.trc.toolbar.right-arrow-content',
+								onClick: item => this.replaceText(item, '→'),
+							},
+						]
+					},
+					{
+						math: true,
+						items: [
+							{
 								label: '∧',
 								tooltipTitle: 'calc.editors.trc.toolbar.and',
 								tooltip: 'calc.editors.trc.toolbar.and-content',
@@ -146,12 +163,18 @@ export class EditorTrc extends React.Component<Props, State> {
 								tooltip: 'calc.editors.trc.toolbar.or-content',
 								onClick: item => this.replaceText(item, '∨'),
 							},
-							// {
-							// 	label: '⊻',
-							// 	tooltipTitle: 'calc.editors.trc.toolbar.xor',
-							// 	tooltip: 'calc.editors.trc.toolbar.xor-content',
-							// 	onClick: item => this.replaceText(item, '⊻'),
-							// },
+							{
+								label: '⊻',
+								tooltipTitle: 'calc.editors.trc.toolbar.xor',
+								tooltip: 'calc.editors.trc.toolbar.xor-content',
+								onClick: item => this.replaceText(item, '⊻'),
+							},
+							{
+								label: '⇒',
+								tooltipTitle: 'calc.editors.trc.toolbar.implies',
+								tooltip: 'calc.editors.trc.toolbar.implies-content',
+								onClick: item => this.replaceText(item, '⇒'),
+							},
 							{
 								label: '¬',
 								tooltipTitle: 'calc.editors.trc.toolbar.not',
@@ -205,12 +228,6 @@ export class EditorTrc extends React.Component<Props, State> {
 						math: true,
 						items: [
 							{
-								label: '⇒',
-								tooltipTitle: 'calc.editors.trc.toolbar.implies',
-								tooltip: 'calc.editors.trc.toolbar.implies-content',
-								onClick: item => this.replaceText(item, '⇒'),
-							},
-							{
 								label: '∃',
 								tooltipTitle: 'calc.editors.trc.toolbar.exists',
 								tooltip: 'calc.editors.trc.toolbar.exists-content',
@@ -221,13 +238,7 @@ export class EditorTrc extends React.Component<Props, State> {
 								tooltipTitle: 'calc.editors.trc.toolbar.for-all',
 								tooltip: 'calc.editors.trc.toolbar.for-all-content',
 								onClick: item => this.replaceText(item, '∀'),
-							},
-							{
-								label: '→',
-								onClick: this.replaceText,
-								tooltipTitle: 'calc.editors.trc.toolbar.right-arrow',
-								tooltip: 'calc.editors.trc.toolbar.right-arrow-content',
-							},
+							}
 						]
 					},
 					{
