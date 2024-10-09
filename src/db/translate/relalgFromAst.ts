@@ -257,6 +257,9 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'Negation': {
+				if (nRaw.formula.type === 'RelationPredicate') {
+					throw new Error('Cannot negate RelationPredicate (unsafe formula)')
+				}
 				return rec(nRaw.formula, baseRel, !negated)
 			}
 
