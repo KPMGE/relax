@@ -23,6 +23,10 @@
 		return { variable, attribute, alias };
 	}
 
+	function createTrcRoot(variables, formula, projections) {
+    return { type: 'TRC_Expr', variables, formula, projections };
+	}
+
 	function getCodeInfo() {
 		return {
 			location: location(),
@@ -77,13 +81,35 @@ all
 TRC_Expr
   = '{' _ variable:Variable _ '|' _ formula:Formula _ '}'
     {
-      return { type: 'TRC_Expr', variable, formula, projections: [] };
+      return createTrcRoot([variable], formula, [])
     }
+	/ '{' _ variables:Variables _ '|' _ formula:Formula _ '}'
+		{
+      return createTrcRoot(variables, formula, [])
+		}
   / '{' _ projections:Projections _ '|' _ formula:Formula _ '}'
     {
-			const variable = projections[0].variable
-      return { type: 'TRC_Expr', variable, formula, projections };
+			const variables = [...new Set(projections.map(proj => proj.variable))]
+      return createTrcRoot(variables, formula, projections)
     }
+	/ '{' _ projectionsAndVars:ProjectionsAndVariables _ '|' _ formula:Formula _ '}'
+    {
+			const variables = projectionsAndVars.map(item => typeof item === 'string' ? item : item.variable)
+      const uniqueVariables = [...new Set(variables)]
+      const projections = projectionsAndVars.filter(item => typeof item !== 'string')
+      return createTrcRoot(variables, formula, projections)
+    }
+
+
+ProjectionsAndVariables
+  = first:ProjectionOrVariable rest:(_ "," _ ProjectionOrVariable)*
+    {
+      return [first].concat(rest.map(r => r[3]))
+    }
+
+ProjectionOrVariable
+  = Projection
+  / Variable
 
 Formula = LogicalExpression
 
@@ -149,11 +175,6 @@ LogicOp
   / xor
   / implication
 
-Attribute
-  = [a-zA-Z_][a-zA-Z0-9_]*
-    {
-      return text();
-    }
 
 String
   = [a-zA-Z_][a-zA-Z0-9_]*
@@ -161,11 +182,18 @@ String
       return text();
     }
 
+Attribute = String
+
 Relation = String
 
 Alias = String
 
 Variable = String
+
+Variables = firstVar: Variable vars: ("," _ Variable)* 
+	{
+		return [firstVar].concat(vars.map(v => v[2]))
+	}
 
 LeftArrow
   = ('<-' / '←')
