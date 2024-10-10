@@ -165,7 +165,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					const nonProjectedVars = nRaw.variables.filter((variable: string) => !projectedVars.includes(variable))
 					const nonProjectedVarsCols = nonProjectedVars.flatMap((variable: string) => {
 						const pred = getRelationPredicate(nRaw, variable)
-						if (!relationPredicate) {
+						if (!pred) {
 							throw new Error('Relation predicate must be defined!')
 						}
 
