@@ -68,20 +68,25 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return makeValueExpr('boolean', func, args)
 	}
 
-	function getRelationPredicate(root: any, scopeChanges = 0): trcAst.RelationPredicate | null {
+	function getRelationPredicate(root: any, tupleVar: string, scopeChanges = 0): trcAst.RelationPredicate | null {
 		// NOTE: this represents that the scope has changed, so it doesn't make sense to keep searching
 		if (scopeChanges >= 2) {
 			return null
 		}
 
 		switch (root.type) {
-			case 'TRC_Expr': return getRelationPredicate(root.formula, ++scopeChanges)
-			case 'RelationPredicate': return root
-			case 'Negation': return getRelationPredicate(root.formula, scopeChanges)
-			case 'QuantifiedExpression': return getRelationPredicate(root.formula, ++scopeChanges)
+			case 'TRC_Expr': return getRelationPredicate(root.formula, tupleVar, ++scopeChanges)
+			case 'RelationPredicate': {
+				if (root.variable === tupleVar) {
+					return root
+				}
+				return null
+			}
+			case 'Negation': return getRelationPredicate(root.formula, tupleVar, scopeChanges)
+			case 'QuantifiedExpression': return getRelationPredicate(root.formula, tupleVar, ++scopeChanges)
 			case 'LogicalExpression': {
-				const left =  getRelationPredicate(root.left, scopeChanges) 
-				const right = getRelationPredicate(root.right, scopeChanges)
+				const left = getRelationPredicate(root.left, tupleVar, scopeChanges)
+				const right = getRelationPredicate(root.right, tupleVar, scopeChanges)
 
 				// NOTE: if more than one relationPredicate was encountered
 				if (left && right) {
@@ -113,38 +118,71 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		formula
 	})
 
+	function handleRenameRelation(nRaw: any, variable: string): RANode {
+		const relationPredicate = getRelationPredicate(nRaw, variable)
+		if (!relationPredicate) {
+			throw new Error('Relation predicate must be defined!')
+		}
+
+		const rel = relations[relationPredicate.relation].copy()
+		if (!rel) {
+			throw new Error("Could not get the tuple relation by its reference!")
+		}
+
+		return new RenameRelation(rel, relationPredicate.variable)
+	}
+
+	function handleTupleVariables(nRaw: any): RANode {
+		if (nRaw.variables.length <= 1) {
+			return handleRenameRelation(nRaw, nRaw.variables[0])
+		}
+
+		const renamedRelations = nRaw.variables.map((variable: string) => handleRenameRelation(nRaw, variable))
+		const base = renamedRelations.reduce((rel1: RANode, rel2: RANode) => {
+			return new CrossJoin(rel1, rel2)
+		})
+
+		return base
+	}
+
 	function rec(nRaw: trcAst.TRC_Expr | any, baseRel: RANode | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
-				const relationPredicate = getRelationPredicate(nRaw)
-
-				if (!relationPredicate) {
-					throw new Error('Relation predicate must be defined!')
-				}
-
-				const tupleRel =  relations[relationPredicate.relation].copy()
-				const renamedRel = new RenameRelation(tupleRel, relationPredicate.variable)
-
-				if (!tupleRel) {
-					throw new Error("Could not get the tuple relation by its reference!")
-				}
+				const base = handleTupleVariables(nRaw)
 
 				if (nRaw.projections.length > 0) {
-					const form = rec(nRaw.formula, renamedRel)
+					const form = rec(nRaw.formula, base)
 
 					const renamedCols = new RenameColumns(form)
 
 					nRaw.projections.forEach((proj: trcAst.Projection) => {
 						if (proj.alias) {
-							renamedCols.addRenaming(proj.alias, proj.attribute, null)
+							renamedCols.addRenaming(proj.alias, proj.attribute, proj.variable)
 						}
 					})
 
-					const projCols = nRaw.projections.map((c: trcAst.Projection) => new Column(c.alias ?? c.attribute, null))
-					return new Projection(renamedCols, projCols)
+					const projectedVars = nRaw.projections.map((c: trcAst.Projection) => c.variable)
+					const nonProjectedVars = nRaw.variables.filter((variable: string) => !projectedVars.includes(variable))
+					const nonProjectedVarsCols = nonProjectedVars.flatMap((variable: string) => {
+						const pred = getRelationPredicate(nRaw, variable)
+						if (!relationPredicate) {
+							throw new Error('Relation predicate must be defined!')
+						}
+
+						const rel = relations[pred.relation].copy() as Relation
+						if (!rel) throw new Error("Cannot find relation!")
+
+						const cols = rel.getSchema().getColumns()
+						cols.forEach(c => c.setRelAlias(pred.variable))
+						return cols
+					})
+
+					const projCols = nRaw.projections.map((c: trcAst.Projection) => new Column(c.alias ?? c.attribute, c.variable))
+
+					return new Projection(renamedCols, projCols.concat(nonProjectedVarsCols))
 				}
 
-				return rec(nRaw.formula, renamedRel)
+				return rec(nRaw.formula, base)
 			}
 
 			case 'QuantifiedExpression': {
@@ -154,7 +192,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 							throw new Error('Base relation is null!')
 						}
 
-						const relationPredicate = getRelationPredicate(nRaw)
+						const relationPredicate = getRelationPredicate(nRaw, nRaw.variable)
 						if (!relationPredicate) {
 							throw new Error('Relation predicate must be defined!')
 						}
@@ -182,7 +220,7 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 						if (nRaw.formula.type === 'RelationPredicate') {
 							return rec({ ...exists, formula: nRaw.formula }, baseRel)
 						}
- 
+
 						// NOTE: ¬∀xP(x) ≡ ∃x(¬P(x))
 						if (negated) {
 							return rec(exists, baseRel)
@@ -240,6 +278,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 					}
 
 					case 'and': {
+						if (nRaw.left.type === 'RelationPredicate' && nRaw.right.type === 'RelationPredicate') {
+							return baseRel
+						}
+
 						if (nRaw.left.type === 'RelationPredicate') {
 							return rec(nRaw.right, baseRel, negated)
 						}
@@ -263,7 +305,10 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 			}
 
 			case 'RelationPredicate': {
-				return relations[nRaw.relation].copy()
+				if (!baseRel) {
+					throw new Error('Base relation is null!')
+				}
+				return new SemiJoin(baseRel, relations[nRaw.relation].copy(), true)
 			}
 
 			case 'Negation': {

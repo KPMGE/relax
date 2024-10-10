@@ -64,32 +64,6 @@ function exec_ra(query: string) {
 
 
 QUnit.module('translate trc ast to relational algebra', () => {
-	QUnit.test('test simple relation', (assert) => {
-		const query = '{ t | R(t) }';
-		const root = exec_trc(query);
-
-		assert.deepEqual(root.getResult(), srcTableR.getResult());
-	});
-
-	QUnit.test('test projection', (assert) => {
-		const queryTrc = '{ t.a, t.b | R(t) }';
-		const queryRa = 'pi a, b (R)';
-
-		const resultTrc = exec_trc(queryTrc).getResult();
-		const resultRa = exec_ra(queryRa).getResult();
-
-		assert.deepEqual(resultRa, resultTrc);
-	});
-
-	QUnit.test('test tuple variable renaming', (assert) => {
-		const queryTrc = '{ r.a->x, r.b->y, r.c->z | R(r) }';
-		const queryRa = 'pi x, y, z (ρ x←a, y←b, z←c R)';
-
-		const resultTrc = exec_trc(queryTrc).getResult();
-		const resultRa = exec_ra(queryRa).getResult();
-
-		assert.deepEqual(resultRa, resultTrc);
-	});
 
 	QUnit.test('test formula aliasing', (assert) => {
 		const queryTrc = '{ r | R(r) and ∃p (R(p) and p.a > 1) }';
@@ -97,6 +71,80 @@ QUnit.module('translate trc ast to relational algebra', () => {
 		const resultTrc = exec_trc(queryTrc).getResult();
 
 		assert.deepEqual(resultTrc.getRows(), srcTableR.getResult().getRows());
+	});
+
+	QUnit.module('Projection', () => {
+
+		QUnit.module('Single tuple variable', () => {
+			QUnit.test('test project all columns', (assert) => {
+				const query = '{ t | R(t) }';
+				const root = exec_trc(query);
+
+				assert.deepEqual(root.getResult().getRows(), srcTableR.getResult().getRows());
+			});
+
+			QUnit.test('test project some columns', (assert) => {
+				const queryTrc = '{ t.a, t.b | R(t) }';
+				const queryRa = 'pi t.a, t.b (ρt(R))';
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultRa, resultTrc);
+			});
+
+			QUnit.test('test tuple variable renaming', (assert) => {
+				const queryTrc = '{ r.a->x, r.b->y, r.c->z | R(r) }';
+				const queryRa = 'pi x, y, z (ρ x←a, y←b, z←c R)';
+
+				const resultTrc = exec_trc(queryTrc).getResult().getRows();
+				const resultRa = exec_ra(queryRa).getResult().getRows();
+
+				assert.deepEqual(resultRa, resultTrc);
+			});
+		});
+
+		QUnit.module('Multiple tuple variables', () => {
+			QUnit.test('test project all columns', (assert) => {
+				const queryTrc = '{ t, p | R(t) and S(p) }';
+				const queryRa = 'ρ t R ⨯ ρ p S'
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultTrc, resultRa);
+			});
+
+			QUnit.test('test project some columns', (assert) => {
+				const queryTrc = '{ t.a, t.c, p.b, p.d | R(t) and S(p) }';
+				const queryRa = 'π t.a, t.c, p.b, p.d ( ρ t R ⨯ ρ p S )';
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultRa, resultTrc);
+			});
+
+			QUnit.test('test tuple variable renaming', (assert) => {
+				const queryTrc = '{ r.a->x, r.b->y, p.d->z | R(r) and S(p) }';
+				const queryRa = 'π r.x, r.y, p.z ρ x←r.a, y←r.b, z←p.d ( ρ r R ⨯ ρ p S )';
+
+				const resultTrc = exec_trc(queryTrc).getResult().getRows();
+				const resultRa = exec_ra(queryRa).getResult().getRows();
+
+				assert.deepEqual(resultRa, resultTrc);
+			});
+
+			QUnit.test('test mixed projection approaches', (assert) => {
+				const queryTrc = '{ t.a->z, p.b, k | R(t) and S(p) and T(k) }';
+				const queryRa = 'π t.z, p.b, k.b, k.d ρ z←t.a ( ( ρ t R ⨯ ρ p S ) ⨯ ρ k T )';
+
+				const resultTrc = exec_trc(queryTrc).getResult();
+				const resultRa = exec_ra(queryRa).getResult();
+
+				assert.deepEqual(resultRa, resultTrc);
+			});
+		});
 	});
 
 	QUnit.module('Logical implication', () => {
@@ -175,9 +223,9 @@ QUnit.module('translate trc ast to relational algebra', () => {
 			QUnit.test('given predicate with variable reference or false predicate, should return all tuples', (assert) => {
 				const queryTrc = '{ t | R(t) ∨ t.a < 0 }';
 
-				const resultTrc = exec_trc(queryTrc).getResult()
+				const resultTrc = exec_trc(queryTrc).getResult().getRows()
 
-				assert.deepEqual(resultTrc, srcTableR.getResult());
+				assert.deepEqual(resultTrc, srcTableR.getResult().getRows());
 			});
 
 			QUnit.module('Negation', () => {
