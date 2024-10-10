@@ -19,10 +19,6 @@
     return { type: 'Negation', formula };
   }
 
-	function createProjection(variable, attribute, alias = null) {
-		return { variable, attribute, alias };
-	}
-
 	function createTrcRoot(variables, formula, projections) {
     return { type: 'TRC_Expr', variables, formula, projections };
 	}
@@ -50,6 +46,14 @@
 		}
 
 		return root;
+	}
+
+	function getNodeInfo(nodeName){
+		return {
+			type: 'nodeInfo',
+			name: nodeName,
+			location: location(),
+		};
 	}
 }
 
@@ -79,37 +83,18 @@ all
     }
 
 TRC_Expr
-  = '{' _ variable:Variable _ '|' _ formula:Formula _ '}'
-    {
-      return createTrcRoot([variable], formula, [])
-    }
-	/ '{' _ variables:Variables _ '|' _ formula:Formula _ '}'
-		{
-      return createTrcRoot(variables, formula, [])
-		}
-  / '{' _ projections:Projections _ '|' _ formula:Formula _ '}'
-    {
-			const variables = [...new Set(projections.map(proj => proj.variable))]
-      return createTrcRoot(variables, formula, projections)
-    }
-	/ '{' _ projectionsAndVars:ProjectionsAndVariables _ '|' _ formula:Formula _ '}'
-    {
-			const variables = projectionsAndVars.map(item => typeof item === 'string' ? item : item.variable)
-      const uniqueVariables = [...new Set(variables)]
-      const projections = projectionsAndVars.filter(item => typeof item !== 'string')
-      return createTrcRoot(variables, formula, projections)
-    }
+  = '{' _ proj: (listOfNamedColumnExpressions / listOfColumns) _ '|' _ formula:Formula _ '}' 
+	{
+		const nonUniquevariables = proj.map(p => {
+			if (p.type === 'namedColumnExpr')
+				return p.child.args[1]
+			else 
+				return p.relAlias ? p.relAlias : p.name
+		})
+		const variables = [...new Set(nonUniquevariables)]
 
-
-ProjectionsAndVariables
-  = first:ProjectionOrVariable rest:(_ "," _ ProjectionOrVariable)*
-    {
-      return [first].concat(rest.map(r => r[3]))
-    }
-
-ProjectionOrVariable
-  = Projection
-  / Variable
+		return createTrcRoot(variables, formula, proj)
+	}
 
 Formula = LogicalExpression
 
@@ -175,69 +160,15 @@ LogicOp
   / xor
   / implication
 
-
 String
   = [a-zA-Z_][a-zA-Z0-9_]*
     {
       return text();
     }
 
-Attribute = String
-
 Relation = String
 
-Alias = String
-
 Variable = String
-
-Variables = firstVar: Variable vars: ("," _ Variable)* 
-	{
-		return [firstVar].concat(vars.map(v => v[2]))
-	}
-
-LeftArrow
-  = ('<-' / '←')
-    {
-      return '<-';
-    }
-
-RightArrow
-  = ('->' / '→')
-    {
-      return '->';
-    }
-
-Projections
-  = p: Projection pl: ("," _ Projection)*
-    {
-      return [p].concat(pl.map(p => p[2]))
-    }
-
-Projection
-  = variable:Variable "." attribute:Variable _ RightArrow _ alias:Alias
-		{
-			return createProjection(variable, attribute, alias)
-		}
-	/ variable:Variable _ '[' _ attribute:Variable _ ']' _ RightArrow  _ alias:Alias
-		{
-			return createProjection(variable, attribute, alias)
-		}
-  / alias:Alias _ LeftArrow _ variable:Variable "." attribute:Variable
-		{
-			return createProjection(variable, attribute, alias)
-		}
-	/ alias:Alias _ LeftArrow  _ variable:Variable _ '[' _ attribute:Variable _ ']'
-		{
-			return createProjection(variable, attribute, alias)
-		}
-	/ variable:Variable "." attribute:Variable 
-    {
-			return createProjection(variable, attribute)
-    }
-  / variable:Variable _ '[' _ attribute:Variable _ ']'
-    {
-			return createProjection(variable, attribute)
-    }
 
 existentialQuantifier
   = 'exists'i
@@ -367,6 +298,19 @@ boolean
 	{ return true; }
 / 'false'i
 	{ return false; }
+
+arrowLeft
+= _ o:('←' { return getNodeInfo('arrowLeft'); }) _
+	{ return o; }
+/ _ o:('<-' { return getNodeInfo('arrowLeft'); }) _
+	{ return o; }
+
+arrowRight
+= _ o:('→' { return getNodeInfo('arrowRight'); }) _
+	{ return o; }
+/ _ o:('->' { return getNodeInfo('arrowRight'); }) _
+	{ return o; }
+
 
 EOF
 = !.
@@ -833,6 +777,59 @@ columnName
 			name: parseInt(index, 10),
 			relAlias: relAlias
 		};
+	}
+
+namedColumnExpr
+= a:valueExpr arrowRight dst:unqualifiedColumnName
+	{
+		return {
+			type: 'namedColumnExpr',
+			name: dst,
+			relAlias: null,
+			child: a,
+
+			codeInfo: getCodeInfo()
+		};
+	}
+/ dst:unqualifiedColumnName arrowLeft a:valueExpr
+	{
+		return {
+			type: 'namedColumnExpr',
+			name: dst,
+			relAlias: null,
+			child: a,
+
+			codeInfo: getCodeInfo()
+		};
+	}
+/ a:columnName
+	{
+		return a;
+	}
+
+// list of columns (kd.id, kd.name, test) e.g. for the projection
+listOfNamedColumnExpressions
+= a:namedColumnExpr b:(_ ',' _ namedColumnExpr)*
+	{
+		var t = [a];
+		if(b !== null){
+			for(var i in b){
+				t.push(b[i][3]);
+			}
+		}
+		return t;
+	}
+
+listOfColumns
+= a:columnName b:(_ ',' _ columnName)*
+	{
+		var t = [a];
+		if(b !== null){
+			for(var i in b){
+				t.push(b[i][3]);
+			}
+		}
+		return t;
 	}
 
 RESERVED_KEYWORD = RESERVED_KEYWORD_RELALG

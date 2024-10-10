@@ -10,11 +10,7 @@ declare namespace trcAst {
 		formula: LogicalExpression
 	}
 
-	interface Projection {
-		variable: string,
-		attribute: string,
-		alias: string | null
-	}
+	type Projection = (relalgAst.columnName | relalgAst.namedColumnExpr)[]
 
 	interface LogicalExpression {
 		type: 'LogicalExpression',
