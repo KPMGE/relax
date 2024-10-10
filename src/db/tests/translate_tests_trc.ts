@@ -137,7 +137,7 @@ QUnit.module('translate trc ast to relational algebra', () => {
 
 			QUnit.test('test mixed projection approaches', (assert) => {
 				const queryTrc = '{ t.a->z, p.b, k | R(t) and S(p) and T(k) }';
-				const queryRa = 'π t.z, p.b, k.b, k.d ρ z←t.a ( ( ρ t R ⨯ ρ p S ) ⨯ ρ k T )';
+				const queryRa = 'π t.a→z, p.b, k.b, k.d ( ( ρ t R ⨯ ρ p S ) ⨯ ρ k T )';
 
 				const resultTrc = exec_trc(queryTrc).getResult();
 				const resultRa = exec_ra(queryRa).getResult();

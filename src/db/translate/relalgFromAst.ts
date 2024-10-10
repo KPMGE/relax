@@ -145,44 +145,44 @@ export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations:
 		return base
 	}
 
+	function getAllColumns(nRaw: any, variable: string): Column[] {
+		const pred = getRelationPredicate(nRaw, variable)
+		if (!pred) {
+			throw new Error('Relation predicate must be defined!')
+		}
+
+		const rel = relations[pred.relation].copy() as Relation
+		if (!rel) throw new Error("Cannot find relation!")
+
+		const cols = rel.getSchema().getColumns()
+		cols.forEach(c => c.setRelAlias(pred.variable))
+
+		return cols
+	}
+
 	function rec(nRaw: trcAst.TRC_Expr | any, baseRel: RANode | null = null, negated: boolean = false): any {
 		switch (nRaw.type) {
 			case 'TRC_Expr': {
+				const projections = nRaw.projections.flatMap((e: any) => {
+					if (e.type === 'columnName') {
+						if (e.relAlias === null) {
+							return getAllColumns(nRaw, e.name)
+						}
+
+						return [new Column(e.name, e.relAlias)]
+					}
+
+					return [{
+						name: e.name,
+						relAlias: e.relAlias,
+						child: recValueExpr(e.child),
+					}]
+				})
+
 				const base = handleTupleVariables(nRaw)
+				const res = rec(nRaw.formula, base)
 
-				if (nRaw.projections.length > 0) {
-					const form = rec(nRaw.formula, base)
-
-					const renamedCols = new RenameColumns(form)
-
-					nRaw.projections.forEach((proj: trcAst.Projection) => {
-						if (proj.alias) {
-							renamedCols.addRenaming(proj.alias, proj.attribute, proj.variable)
-						}
-					})
-
-					const projectedVars = nRaw.projections.map((c: trcAst.Projection) => c.variable)
-					const nonProjectedVars = nRaw.variables.filter((variable: string) => !projectedVars.includes(variable))
-					const nonProjectedVarsCols = nonProjectedVars.flatMap((variable: string) => {
-						const pred = getRelationPredicate(nRaw, variable)
-						if (!pred) {
-							throw new Error('Relation predicate must be defined!')
-						}
-
-						const rel = relations[pred.relation].copy() as Relation
-						if (!rel) throw new Error("Cannot find relation!")
-
-						const cols = rel.getSchema().getColumns()
-						cols.forEach(c => c.setRelAlias(pred.variable))
-						return cols
-					})
-
-					const projCols = nRaw.projections.map((c: trcAst.Projection) => new Column(c.alias ?? c.attribute, c.variable))
-
-					return new Projection(renamedCols, projCols.concat(nonProjectedVarsCols))
-				}
-
-				return rec(nRaw.formula, base)
+				return new Projection(res, projections)
 			}
 
 			case 'QuantifiedExpression': {
