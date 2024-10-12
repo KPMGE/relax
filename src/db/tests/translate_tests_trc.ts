@@ -74,6 +74,18 @@ QUnit.module('translate trc ast to relational algebra', () => {
 	});
 
 	QUnit.module('Projection', () => {
+		QUnit.test('test helper functions', (assert) => {
+			const queryTrc1 = '{ concat(t.b, t.c)->bla | R(t) }';
+			const queryTrc2 = '{ (t.b || t.c)->bla | R(t) }';
+			const queryRa = 'pi concat(b, c)->bla (R)'
+
+			const resultTrc1 = exec_trc(queryTrc1).getResult();
+			const resultTrc2 = exec_trc(queryTrc2).getResult();
+			const resultRa = exec_ra(queryRa).getResult();
+
+			assert.deepEqual(resultTrc1.getRows(), resultRa.getRows());
+			assert.deepEqual(resultTrc2.getRows(), resultRa.getRows());
+		});
 
 		QUnit.module('Single tuple variable', () => {
 			QUnit.test('test project all columns', (assert) => {

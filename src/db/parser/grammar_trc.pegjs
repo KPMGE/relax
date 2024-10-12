@@ -85,14 +85,17 @@ all
 TRC_Expr
   = '{' _ proj: (listOfNamedColumnExpressions / listOfColumns) _ '|' _ formula:Formula _ '}' 
 	{
-		const nonUniquevariables = proj.map(p => {
-			if (p.type === 'namedColumnExpr')
-				return p.child.args[1]
-			else 
-				return p.relAlias ? p.relAlias : p.name
+		const nonUniquevariables = proj.flatMap(p => {
+			if (p.type === 'namedColumnExpr' && p.child.func === 'columnValue') {
+				return [p.child.args[1]]
+			}
+			if (p.type === 'namedColumnExpr') {
+				return p.child.args.map(a => a.args[1])
+			}
+			return [p.relAlias ? p.relAlias : p.name]
 		})
-		const variables = [...new Set(nonUniquevariables)]
 
+		const variables = [...new Set(nonUniquevariables)]
 		return createTrcRoot(variables, formula, proj)
 	}
 
