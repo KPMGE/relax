@@ -3,7 +3,7 @@
     return { type: 'RelationPredicate', relation, variable };
   }
 
-  function createPredicate(left, condition) {
+  function createPredicate(condition) {
     return { type: 'Predicate', condition };
   }
 
@@ -108,8 +108,8 @@ LogicalExpression
     }
 
 AtomicFormula
-  = RelationPredicate
-  / Predicate
+  = Predicate
+  / RelationPredicate
 
 BaseFormula 
   =	AtomicFormula 
@@ -149,9 +149,9 @@ RelationPredicate
     }
 
 Predicate
-	= condition: valueExpr 
+	= _ condition: valueExpr _
 		{
-			return { type: 'Predicate', condition }
+			return createPredicate(condition)
 		}
 
 LogicOp
