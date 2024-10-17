@@ -74,6 +74,8 @@ export class EditorRelalg extends React.Component<Props, State> {
 				mode="relalg"
 				execFunction={(self: EditorBase, text: string, offset) => {
 					const ast = parseRelalg(text, Object.keys(relations));
+					console.log('REALG AST: ', ast)
+
 					replaceVariables(ast, relations);
 
 					if (ast.child === null) {
@@ -100,6 +102,7 @@ export class EditorRelalg extends React.Component<Props, State> {
 					return {
 						result: (
 							<Result
+								editorRef={this.editorBase!}
 								root={root}
 								numTreeLabelColors={NUM_TREE_LABEL_COLORS}
 								execTime={self.state.execTime == null ? 0 : self.state.execTime}

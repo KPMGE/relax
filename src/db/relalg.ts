@@ -13,7 +13,12 @@ import { replaceVariables } from './translate/replaceVariables';
 
 
 export { parseRelalg, parseRelalgGroup } from './parser/parser_ra';
-export { relalgFromRelalgAstNode, relalgFromRelalgAstRoot, relalgFromSQLAstRoot } from './translate/relalgFromAst';
+export { 
+	relalgFromRelalgAstNode,
+	relalgFromRelalgAstRoot,
+	relalgFromSQLAstRoot,
+	relalgFromTRCAstRoot
+} from './translate/relalgFromAst';
 export { replaceVariables } from './translate/replaceVariables';
 export { textFromGroupAstRoot, textFromRelalgAstNode, textFromRelalgAstRoot } from './translate/textFromAst';
 
@@ -131,7 +136,95 @@ export function queryWithReplacedOperatorsFromAst(
 	};
 }
 
+export function queryWithReplacedTRCOperatorsFromAst(
+	query: string,
+	cursor: TextCursor,
+	mode: AutoreplaceOperatorsMode,
+): { query: string, cursor: TextCursor } {
+	if (mode === 'none') {
+		return {
+			query,
+			cursor,
+		};
+	}
 
+	const newOperators = {
+		'math2plain': {
+			'∈': 'in',
+			'←': '<-',
+			'→': '->',
+			'∧': 'and',
+			'⊻': 'xor',
+			'⊕': 'xor',
+			'∨': 'or',
+			'⇒': '=>',
+			'¬': 'not',
+			'!': 'not',
+			'≠': '!=',
+			'<>': '!=',
+			'≤': '<=',
+			'≥': '>=',
+			'∃': 'exists',
+			'∀': 'for all',
+		},
+		'plain2math': {
+			'in': '∈',
+			'<-': '←',
+			'->': '→',
+			'and': '∧',
+			'xor': '⊻',
+			'or': '∨',
+			'implies': '⇒',
+			'!': '¬',
+			'not': '¬',
+			'!=': '≠',
+			'<>': '≠',
+			'<=': '≤',
+			'>=': '≥',
+			'=>': '⇒',
+			'exists': '∃',
+			'for all': '∀',
+		},
+	};
+	
+	// Naive implementation to replace operators in a TRC query expression
+	// TODO: Walk through AST and replace based on the operator type/name
+	for (const op in newOperators[mode]) {
+		const newOperator = (newOperators[mode] as { [key: string]: string })[op];
+		const oldOperator = op;
+		const regex = new RegExp(oldOperator, 'g');
+		query = query.replace(regex, newOperator);
+	}
+
+	return {
+		query,
+		cursor,
+	};
+}
+
+const pegParserTrc = require('./parser/grammar_trc.pegjs') as any;
+
+export function parseTRCSelect(text: string): trcAst.TRC_Expr {
+
+	return pegParserTrc.parse(
+		text,
+		{
+			startRule: 'start',
+			tracer: undefined,
+			i18n,
+		},
+	);
+}
+
+export function parseTRCDump(text: string): relalgAst.GroupRoot {
+	return pegParserTrc.parse(
+		text,
+		{
+			startRule: 'dbDumpStart',
+			tracer: undefined,
+		},
+	);
+}
 
 const pegParserSql = require('./parser/grammar_sql.pegjs') as any;
 

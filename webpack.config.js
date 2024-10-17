@@ -155,6 +155,11 @@ module.exports = (env, options) => {
 					loader: 'pegjs-loader?cache=true&trace=false&allowedStartRules[]=start&allowedStartRules[]=dbDumpStart',
 				},
 				{
+					// https://github.com/eploko/pegjs-loader
+					test: /grammar_trc\.pegjs$/,
+					loader: 'pegjs-loader?cache=true&trace=false&allowedStartRules[]=start&allowedStartRules[]=dbDumpStart',
+				},
+				{
 					// normal js and ts code
 					test: /\.(ts|tsx|js|jsx)?$/,
 					exclude: /(node_modules|bower_components)/,

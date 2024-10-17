@@ -1,5 +1,4 @@
 /*** Copyright 2016 Johannes Kessler 2016 Johannes Kessler
-*
 * This Source Code Form is subject to the terms of the Mozilla Public
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -32,8 +31,6 @@ import { Union } from '../exec/Union';
 import * as ValueExpr from '../exec/ValueExpr';
 import { EliminateDuplicates } from '../exec/EliminateDuplicates';
 
-
-
 function parseJoinCondition(condition: relalgAst.booleanExpr | string[] | null): JoinCondition {
 	if (condition === null) {
 		return {
@@ -53,6 +50,290 @@ function parseJoinCondition(condition: relalgAst.booleanExpr | string[] | null):
 			joinExpression: recValueExpr(condition as relalgAst.booleanExpr),
 		};
 	}
+}
+
+// translate a TRC-AST to RA
+export function relalgFromTRCAstRoot(astRoot: trcAst.TRC_Expr | null, relations: { [key: string]: Relation }): RANode {
+	type DataType = 'string' | 'boolean' | 'number' | 'null' | 'date'
+	function makeValueExpr(datatype: DataType, func: relalgAst.ValueExprFunction, args: any[]): relalgAst.valueExpr {
+		return {
+			type: 'valueExpr',
+			datatype,
+			func,
+			args,
+			codeInfo: null as any
+		}
+	}
+
+	function makeBooleanExpr(func: relalgAst.ValueExprFunction, args: any[]) {
+		return makeValueExpr('boolean', func, args)
+	}
+
+	function getRelationPredicate(root: any, tupleVar: string, scopeChanges = 0): trcAst.RelationPredicate | null {
+		// NOTE: this represents that the scope has changed, so it doesn't make sense to keep searching
+		if (scopeChanges >= 2) {
+			return null
+		}
+
+		switch (root.type) {
+			case 'TRC_Expr': return getRelationPredicate(root.formula, tupleVar, ++scopeChanges)
+			case 'RelationPredicate': {
+				if (root.variable === tupleVar) {
+					return root
+				}
+				return null
+			}
+			case 'Negation': return getRelationPredicate(root.formula, tupleVar, scopeChanges)
+			case 'QuantifiedExpression': return getRelationPredicate(root.formula, tupleVar, ++scopeChanges)
+			case 'LogicalExpression': {
+				const left = getRelationPredicate(root.left, tupleVar, scopeChanges)
+				const right = getRelationPredicate(root.right, tupleVar, scopeChanges)
+
+				// NOTE: if more than one relationPredicate was encountered
+				if (left && right) {
+					throw new Error('Cannot define RelationPredicate more than once per scope!')
+				}
+
+				return left ?? right
+			}
+			default: return null
+		}
+	}
+
+	const and = (left: any, right: any) => ({
+		type: 'LogicalExpression',
+		left,
+		operator: 'and',
+		right
+	})
+
+	const or = (left: any, right: any) => ({
+		type: 'LogicalExpression',
+		left,
+		operator: 'or',
+		right
+	})
+
+	const not = (formula: any) => ({
+		type: 'Negation',
+		formula
+	})
+
+	function handleRenameRelation(nRaw: any, variable: string): RANode {
+		const relationPredicate = getRelationPredicate(nRaw, variable)
+		if (!relationPredicate) {
+			throw new Error('Relation predicate must be defined!')
+		}
+
+		const rel = relations[relationPredicate.relation].copy()
+		if (!rel) {
+			throw new Error("Could not get the tuple relation by its reference!")
+		}
+
+		return new RenameRelation(rel, relationPredicate.variable)
+	}
+
+	function handleTupleVariables(nRaw: any): RANode {
+		if (nRaw.variables.length <= 1) {
+			return handleRenameRelation(nRaw, nRaw.variables[0])
+		}
+
+		const renamedRelations = nRaw.variables.map((variable: string) => handleRenameRelation(nRaw, variable))
+		const base = renamedRelations.reduce((rel1: RANode, rel2: RANode) => {
+			return new CrossJoin(rel1, rel2)
+		})
+
+		return base
+	}
+
+	function getAllColumns(nRaw: any, variable: string): Column[] {
+		const pred = getRelationPredicate(nRaw, variable)
+		if (!pred) {
+			throw new Error('Relation predicate must be defined!')
+		}
+
+		const rel = relations[pred.relation].copy() as Relation
+		if (!rel) throw new Error("Cannot find relation!")
+
+		const cols = rel.getSchema().getColumns()
+		cols.forEach(c => c.setRelAlias(pred.variable))
+
+		return cols
+	}
+
+	function rec(nRaw: trcAst.TRC_Expr | any, baseRel: RANode | null = null, negated: boolean = false): any {
+		switch (nRaw.type) {
+			case 'TRC_Expr': {
+				const projections = nRaw.projections.flatMap((e: any) => {
+					if (e.type === 'columnName') {
+						if (e.relAlias === null) {
+							return getAllColumns(nRaw, e.name)
+						}
+
+						return [new Column(e.name, e.relAlias)]
+					}
+
+					return [{
+						name: e.name,
+						relAlias: e.relAlias,
+						child: recValueExpr(e.child),
+					}]
+				})
+
+				const base = handleTupleVariables(nRaw)
+				const res = rec(nRaw.formula, base)
+
+				return new Projection(res, projections)
+			}
+
+			case 'QuantifiedExpression': {
+				switch (nRaw.quantifier) {
+					case 'exists': {
+						if (!baseRel) {
+							throw new Error('Base relation is null!')
+						}
+
+						const relationPredicate = getRelationPredicate(nRaw, nRaw.variable)
+						if (!relationPredicate) {
+							throw new Error('Relation predicate must be defined!')
+						}
+
+						const relation = relations[relationPredicate.relation].copy()
+						const renamed = new RenameRelation(relation, relationPredicate.variable)
+						const newBaseRel = new CrossJoin(renamed, baseRel)
+
+						if (negated) {
+							const right = rec(nRaw.formula, newBaseRel, false)
+							return new Difference(baseRel, new SemiJoin(baseRel, right, true))
+						}
+
+						const right = rec(nRaw.formula, newBaseRel, negated)
+						return new SemiJoin(baseRel, right, true)
+					}
+
+					case 'forAll': {
+						const exists = {
+							...nRaw,
+							quantifier: 'exists',
+							formula: not(nRaw.formula)
+						}
+
+						if (nRaw.formula.type === 'RelationPredicate') {
+							return rec({ ...exists, formula: nRaw.formula }, baseRel)
+						}
+
+						// NOTE: ¬∀xP(x) ≡ ∃x(¬P(x))
+						if (negated) {
+							return rec(exists, baseRel)
+						}
+
+						// NOTE: ∀xP(x) ≡ ¬∃x(¬P(x))
+						return rec(not(exists), baseRel)
+					}
+
+					default: throw new Error('Unreachable!')
+				}
+			}
+
+			case 'LogicalExpression': {
+				switch (nRaw.operator) {
+					case 'implies': {
+						// NOTE: ¬(p → q) ≡ p ∧ ¬q
+						if (negated) {
+							return rec(and(nRaw.left, not(nRaw.right)), baseRel)
+						}
+
+						// NOTE: p → q ≡ ¬p ∨ q
+						return rec(or(not(nRaw.left), nRaw.right), baseRel)
+					}
+
+					case 'xor': {
+						// NOTE: p ⊻ q = (p ∨ q) ∧ (¬p ∨ ¬q)
+						if (negated) {
+							// ¬(p ⊻ q) = (¬p ∧ ¬q) ∨ (p ∧ q)
+							return rec(
+								or(
+									and(
+										not(nRaw.left), not(nRaw.right)
+									),
+									and(nRaw.left, nRaw.right)
+								),
+								baseRel
+							)
+						}
+
+						const left = rec(or(nRaw.left, nRaw.right), baseRel) as RANode
+						const right = rec(or(not(nRaw.left), not(nRaw.right)), baseRel) as RANode
+						return new Intersect(left, right)
+					}
+
+					case 'or': {
+						// NOTE: ¬(p ∨ q) ≡ ¬p ∧ ¬q
+						if (negated) {
+							return rec(and(not(nRaw.left), not((nRaw.right))), baseRel)
+						}
+
+						const left = rec(nRaw.left, baseRel) as RANode
+						const right = rec(nRaw.right, baseRel) as RANode
+						return new Union(left, right)
+					}
+
+					case 'and': {
+						if (nRaw.left.type === 'RelationPredicate' && nRaw.right.type === 'RelationPredicate') {
+							return baseRel
+						}
+
+						if (nRaw.left.type === 'RelationPredicate') {
+							return rec(nRaw.right, baseRel, negated)
+						}
+
+						if (nRaw.right.type === 'RelationPredicate') {
+							return rec(nRaw.left, baseRel, negated)
+						}
+
+						// NOTE: ¬(p ∧ q) ≡ ¬p ∨ ¬q
+						if (negated) {
+							return rec(or(not(nRaw.left), not((nRaw.right))), baseRel)
+						}
+
+						const left = rec(nRaw.left, baseRel) as RANode
+						const right = rec(nRaw.right, baseRel) as RANode
+						return new Intersect(left, right)
+					}
+
+					default: throw new Error('Unreachable!')
+				}
+			}
+
+			case 'RelationPredicate': {
+				if (!baseRel) {
+					throw new Error('Base relation is null!')
+				}
+				return new SemiJoin(baseRel, relations[nRaw.relation].copy(), true)
+			}
+
+			case 'Negation': {
+				if (nRaw.formula.type === 'RelationPredicate') {
+					throw new Error('Cannot negate RelationPredicate (unsafe formula)')
+				}
+				return rec(nRaw.formula, baseRel, !negated)
+			}
+
+			case 'Predicate': {
+				if (!baseRel) {
+					throw new Error('Base relation is null!')
+				}
+
+				if (negated) {
+					return new Selection(baseRel, recValueExpr(makeBooleanExpr('not', [nRaw.condition])))
+				}
+
+				return new Selection(baseRel, recValueExpr(nRaw.condition))
+			}
+		}
+	}
+
+	return rec(astRoot)
 }
 
 
@@ -157,10 +438,10 @@ export function relalgFromSQLAstRoot(astRoot: sqlAst.rootSql | any, relations: {
 					const rec1: any = rec(n.child);
 					const rec2: any = rec(n.child2);
 					const probableJoinCount = getRowLength(rec1) * getRowLength(rec2);
-					
+
 					// tried and tested with multiple devices / browsers
 					// this seems to be where the browser starts to freeze up
-					if(probableJoinCount > 1000000) {
+					if (probableJoinCount > 1000000) {
 						alert('The CrossJoin may cause the browser to crash. Alternatively try using an INNER JOIN');
 					}
 					node = new CrossJoin(rec(n.child), rec(n.child2));
@@ -426,12 +707,12 @@ function recValueExpr(n: relalgAst.valueExpr | sqlAst.valueExpr): ValueExpr.Valu
 }
 
 function getRowLength(node: any, length: number = 0): number {
-	if(!node) { return 0; }
-	if(node._table) {
+	if (!node) { return 0; }
+	if (node._table) {
 		return node._table._rows.length;
 	}
-	if(node._child) {
-		return getRowLength(node._child) * getRowLength(node._child2);	
+	if (node._child) {
+		return getRowLength(node._child) * getRowLength(node._child2);
 	}
 	return 0;
 }

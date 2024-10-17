@@ -11,6 +11,7 @@ import 'qunit/qunit/qunit.css';
 import './translate_tests_ra';
 import './translate_tests_bags';
 import './translate_tests_sql';
+import './translate_tests_trc';
 import './var_replacer_tests';
 
 QUnit.start();

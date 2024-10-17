@@ -23,6 +23,7 @@ import { GroupRelationList } from '../components/groupRelationList';
 import { MenuConnected } from '../components/menu';
 import { Navigation } from '../components/navigation';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { EditorTrc } from './editorTrc';
 require('./calculator.scss');
 
 
@@ -33,7 +34,7 @@ type Props = {
 };
 
 type State = {
-	activeTab: 'relalg' | 'bagalg' | 'sql' | 'group',
+	activeTab: 'relalg' | 'bagalg' | 'sql' | 'trc' | 'group',
 	datasetModal: boolean,
 	relationModal: boolean,
 };
@@ -43,6 +44,7 @@ export class Calculator extends React.Component<Props, State> {
 	private refEditorRelalg = React.createRef<EditorRelalg>();
 	private refEditorBagalg = React.createRef<EditorBagalg>();
 	private refEditorSql = React.createRef<EditorSql>();
+	private refEditorTrc = React.createRef<EditorTrc>();
 	private refEditorGroup = React.createRef<EditorGroup>();
 
 	constructor(props: Props) {
@@ -92,6 +94,8 @@ export class Calculator extends React.Component<Props, State> {
 				return this.refEditorRelalg;
 			case 'bagalg':
 				return this.refEditorBagalg;
+			case 'trc':
+				return this.refEditorTrc;
 			case 'group':
 				return this.refEditorGroup;
 		}
@@ -197,6 +201,15 @@ example,  42
 							</NavItem>
 							<NavItem>
 								<NavLink
+									className={classnames({ active: activeTab === 'trc' })}
+									onClick={() => { this.setState({ activeTab: 'trc' }); }}
+								>
+									<span className="hideOnSM">TRC</span>
+									<span className="showOnSM">TRC</span>
+								</NavLink>
+							</NavItem>
+							<NavItem>
+								<NavLink
 									className={classnames({ active: activeTab === 'group' })}
 									onClick={() => { this.setState({ activeTab: 'group' }); }}
 								>
@@ -225,6 +238,12 @@ example,  42
 									group={group}
 									ref={this.refEditorSql}
 									relInsertModalToggle={this.insertRelationToggle}
+								/>
+							</TabPane>
+							<TabPane tabId="trc">
+								<EditorTrc
+									group={group}
+									ref={this.refEditorTrc}
 								/>
 							</TabPane>
 							<TabPane tabId="group">
